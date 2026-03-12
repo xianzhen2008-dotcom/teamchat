@@ -1,0 +1,45 @@
+/**
+ * TeamChat Dark Theme - 赛博科技暗色主题
+ */
+
+[data-theme="dark"] {
+    --bg-primary: #0a0a0f;
+    --bg-secondary: #12121a;
+    --bg-tertiary: #1a1a25;
+    --bg-hover: rgba(0, 212, 255, 0.05);
+    --bg-active: rgba(0, 212, 255, 0.1);
+    
+    --text-primary: #ffffff;
+    --text-secondary: #a0a0b0;
+    --text-muted: #606070;
+    --text-inverse: #0a0a0f;
+    
+    --primary: #00d4ff;
+    --primary-dark: #00a8cc;
+    --primary-light: #5ce1ff;
+    
+    --accent: #ff006e;
+    --accent-glow: rgba(255, 0, 110, 0.3);
+    --success: #00f5d4;
+    --warning: #fee440;
+    --error: #f15bb5;
+    
+    --border-color: rgba(0, 212, 255, 0.15);
+    --border-hover: rgba(0, 212, 255, 0.3);
+    --border-active: rgba(0, 212, 255, 0.5);
+    
+    --msg-user-bg: linear-gradient(135deg, #00d4ff 0%, #00a8cc 100%);
+    --msg-agent-bg: rgba(0, 212, 255, 0.08);
+    
+    --input-bg: rgba(0, 0, 0, 0.3);
+    
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+    --shadow-glow: 0 0 20px rgba(0, 212, 255, 0.2);
+    --shadow-glow-strong: 0 0 30px rgba(0, 212, 255, 0.4);
+    
+    --status-online: #00f5d4;
+    --status-busy: #ff006e;
+    --status-offline: #606070;
+}

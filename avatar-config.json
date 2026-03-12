@@ -1,0 +1,76 @@
+{
+  "version": "1.0",
+  "generatedAt": "2026-02-27T12:15:47Z",
+  "compression": {
+    "maxWidth": 200,
+    "quality": 75,
+    "maxFileSizeKB": 30
+  },
+  "avatars": {
+    "我": {
+      "original": "images/我.png",
+      "compressed": "images/compressed/我_compressed.jpg",
+      "sizeKB": 18
+    },
+    "小财": {
+      "original": "images/小财.png",
+      "compressed": "images/compressed/小财_compressed.jpg",
+      "sizeKB": 21
+    },
+    "小测": {
+      "original": "images/小测.png",
+      "compressed": "images/compressed/小测_compressed.jpg",
+      "sizeKB": 20
+    },
+    "小产": {
+      "original": "images/小产.png",
+      "compressed": "images/compressed/小产_compressed.jpg",
+      "sizeKB": 25
+    },
+    "小后": {
+      "original": "images/小后.png",
+      "compressed": "images/compressed/小后_compressed.jpg",
+      "sizeKB": 20
+    },
+    "小龙虾": {
+      "original": "images/小龙虾.png",
+      "compressed": "images/compressed/小龙虾_compressed.jpg",
+      "sizeKB": 25
+    },
+    "小码": {
+      "original": "images/小码.png",
+      "compressed": "images/compressed/小码_compressed.jpg",
+      "sizeKB": 20
+    },
+    "小前": {
+      "original": "images/小前.png",
+      "compressed": "images/compressed/小前_compressed.jpg",
+      "sizeKB": 20
+    },
+    "小数": {
+      "original": "images/小数.png",
+      "compressed": "images/compressed/小数_compressed.jpg",
+      "sizeKB": 19
+    },
+    "小文2": {
+      "original": "images/小文2.png",
+      "compressed": "images/compressed/小文2_compressed.jpg",
+      "sizeKB": 17
+    },
+    "小移": {
+      "original": "images/小移.png",
+      "compressed": "images/compressed/小移_compressed.jpg",
+      "sizeKB": 20
+    },
+    "小邮": {
+      "original": "images/小邮.png",
+      "compressed": "images/compressed/小邮_compressed.jpg",
+      "sizeKB": 20
+    },
+    "小运": {
+      "original": "images/小运.png",
+      "compressed": "images/compressed/小运_compressed.jpg",
+      "sizeKB": 20
+    }
+  }
+}

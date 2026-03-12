@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Team Chat 登录</title>
+    <style>
+        :root {
+            --bg-dark: #0d1117;
+            --panel-dark: #161b22;
+            --text-main: #c9d1d9;
+            --border-color: #30363d;
+            --cyber-green: #3fb950;
+            --cyber-blue: #00d4ff;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .login-container {
+            background-color: var(--panel-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .login-header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--cyber-blue), var(--cyber-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .login-header p {
+            color: #8b949e;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #8b949e;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            background-color: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-main);
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        
+        .form-group input:focus {
+            border-color: var(--cyber-blue);
+        }
+        
+        .form-group input::placeholder {
+            color: #484f58;
+        }
+        
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--cyber-green), #238636);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(63, 185, 80, 0.3);
+        }
+        
+        .login-btn:active {
+            transform: translateY(0);
+        }
+        
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .send-password-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #1f6feb, #1158c7);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 12px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .send-password-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(31, 111, 235, 0.3);
+        }
+        
+        .send-password-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .error-message {
+            background-color: rgba(248, 81, 73, 0.1);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 20px;
+            color: #f85149;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .error-message.show {
+            display: block;
+        }
+        
+        .local-hint {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            font-size: 13px;
+            color: #8b949e;
+        }
+        
+        .local-hint a {
+            color: var(--cyber-blue);
+            text-decoration: none;
+        }
+        
+        .local-hint a:hover {
+            text-decoration: underline;
+        }
+        
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, var(--cyber-blue), var(--cyber-green));
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <div class="logo">🦞</div>
+            <h1>Team Chat</h1>
+            <p>OpenClaw Agent 团队协作平台</p>
+        </div>
+        
+        <div class="error-message" id="error-msg"></div>
+        
+        <form id="login-form">
+            <div class="form-group">
+                <label for="password">访问密码</label>
+                <input type="password" id="password" placeholder="请输入访问密码" autocomplete="current-password" required>
+            </div>
+            
+            <button type="submit" class="login-btn" id="login-btn">登录</button>
+            
+            <button type="button" class="send-password-btn" id="send-password-btn" onclick="sendPasswordToWechat()">📤 发送登录口令到企业微信</button>
+        </form>
+        
+        <div class="local-hint">
+            本地访问？<a href="http://127.0.0.1:18788/">点击这里</a> 无需登录
+        </div>
+    </div>
+    
+    <script>
+        const form = document.getElementById('login-form');
+        const passwordInput = document.getElementById('password');
+        const loginBtn = document.getElementById('login-btn');
+        const errorMsg = document.getElementById('error-msg');
+        
+        const SESSION_KEY = 'team_chat_session';
+        
+        function showError(message) {
+            errorMsg.textContent = message;
+            errorMsg.classList.add('show');
+        }
+        
+        function hideError() {
+            errorMsg.classList.remove('show');
+        }
+        
+        async function handleLogin(e) {
+            e.preventDefault();
+            hideError();
+            
+            const password = passwordInput.value.trim();
+            if (!password) {
+                showError('请输入密码');
+                return;
+            }
+            
+            loginBtn.disabled = true;
+            loginBtn.textContent = '登录中...';
+            
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                
+                const data = await res.json();
+                
+                if (data.ok && data.session) {
+                    localStorage.setItem(SESSION_KEY, data.session);
+                    document.cookie = `session=${data.session}; path=/; max-age=86400`;
+                    // 登录成功后跳转到新版界面（使用 replace 避免历史记录问题）
+                    window.location.replace('/?session=' + data.session);
+                } else {
+                    showError(data.error || '登录失败');
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = '登录';
+                }
+            } catch (err) {
+                showError('网络错误，请重试');
+                loginBtn.disabled = false;
+                loginBtn.textContent = '登录';
+            }
+        }
+        
+        form.addEventListener('submit', handleLogin);
+        
+        var sessionChecked = false;
+        
+        async function checkSession() {
+            if (sessionChecked) return;
+            sessionChecked = true;
+            
+            const session = localStorage.getItem(SESSION_KEY);
+            if (session) {
+                try {
+                    const res = await fetch('/api/check-auth', {
+                        headers: { 'X-Session-Token': session }
+                    });
+                    const data = await res.json();
+                    if (data.authenticated) {
+                        document.cookie = `session=${session}; path=/; max-age=86400`;
+                        // 跳转到新版界面（使用 replace 避免历史记录问题）
+                        window.location.replace('/?session=' + session);
+                    }
+                } catch (e) {
+                    // 忽略错误，继续显示登录页面
+                }
+            }
+        }
+        
+        checkSession();
+        
+        // 发送密码到企微
+        async function sendPasswordToWechat() {
+            const btn = document.getElementById('send-password-btn');
+            btn.textContent = '发送中...';
+            btn.disabled = true;
+            
+            try {
+                // 调用API触发发送密码到企微
+                const response = await fetch('/api/password/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    btn.textContent = '✅ 已发送';
+                    alert('登录口令已发送到企业微信！');
+                } else {
+                    btn.textContent = '📤 发送登录口令到企业微信';
+                    btn.disabled = false;
+                    alert(data.error || '发送失败');
+                }
+            } catch (e) {
+                btn.textContent = '📤 发送登录口令到企业微信';
+                btn.disabled = false;
+                alert('发送失败: ' + e.message);
+            }
+        }
+        
+        // 自动聚焦密码输入框
+        passwordInput.focus();
+    </script>
+</body>
+</html>

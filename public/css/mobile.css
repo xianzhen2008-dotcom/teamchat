@@ -1,0 +1,268 @@
+/**
+ * TeamChat Mobile Styles - 重写版
+ */
+
+@media screen and (max-width: 768px) {
+    /* ========== 基础布局 ========== */
+    
+    html, body {
+        overflow-x: hidden;
+        width: 100%;
+        max-width: 100vw;
+    }
+    
+    .app-container {
+        width: 100%;
+        max-width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        overflow-x: hidden;
+    }
+    
+    /* ========== 侧边栏 ========== */
+    
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 280px;
+        z-index: 9999 !important;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        box-shadow: none;
+    }
+    
+    .sidebar.active,
+    body.sidebar-collapsed .sidebar.active {
+        transform: translateX(0);
+        box-shadow: 10px 0 50px rgba(0, 0, 0, 0.5);
+    }
+    
+    .sidebar-overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0);
+        z-index: 9998 !important;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+    }
+    
+    .sidebar-overlay.active {
+        background: rgba(0, 0, 0, 0.6);
+        opacity: 1;
+        visibility: visible;
+    }
+    
+    /* ========== 聊天容器 ========== */
+    
+    .chat-container {
+        width: 100%;
+        max-width: 100vw;
+        overflow-x: hidden;
+    }
+    
+    .messages-view {
+        width: 100%;
+        max-width: 100vw;
+        overflow-x: hidden;
+    }
+    
+    .chat-header {
+        height: 56px;
+        min-height: 56px;
+        padding: 0 12px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 200;
+    }
+    
+    .header-title {
+        font-size: 16px;
+    }
+    
+    /* ========== 消息视图 ========== */
+    
+    .messages-view {
+        padding-top: 72px;
+        padding-bottom: 100px;
+    }
+    
+    .msg {
+        max-width: 90%;
+    }
+    
+    .msg-avatar {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .msg-content {
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+    
+    /* 移动端图片更小 */
+    .msg-content img {
+        max-height: 250px;
+        border-radius: 6px;
+    }
+    
+    /* 移动端点击放大提示 */
+    .msg-content img {
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    
+    .msg-content img:active {
+        transform: scale(0.98);
+    }
+    
+    /* ========== 输入区域 ========== */
+    
+    .input-area {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 8px 12px;
+        padding-bottom: max(8px, env(safe-area-inset-bottom));
+        z-index: 100;
+    }
+    
+    .input-row {
+        gap: 8px;
+    }
+    
+    #chat-input {
+        min-height: 36px;
+        padding: 8px 12px;
+    }
+    
+    .btn-action {
+        padding: 6px;
+        font-size: 18px;
+    }
+    
+    .btn-send {
+        padding: 8px 12px;
+        font-size: 16px;
+    }
+    
+    /* ========== 图片预览移动端适配 ========== */
+    
+    .image-preview {
+        max-width: 100%;
+        border-radius: 8px;
+    }
+    
+    .image-preview img {
+        max-height: 250px;
+    }
+    
+    /* ========== 横向文件卡片移动端适配 ========== */
+
+    .file-card-horizontal {
+        max-width: 100%;
+        padding: 8px 10px;
+        gap: 10px;
+    }
+
+    .file-card-name {
+        font-size: 13px;
+    }
+
+    .file-card-meta {
+        font-size: 11px;
+    }
+
+    .file-card-icon-box {
+        width: 44px;
+        height: 44px;
+        border-radius: 8px;
+    }
+
+    .file-card-icon-emoji {
+        font-size: 22px;
+    }
+    
+    /* 链接卡片移动端适配 */
+    .link-card {
+        max-width: 100%;
+        padding: 10px;
+        gap: 10px;
+    }
+    
+    .link-card-thumb {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .link-card-title {
+        font-size: 13px;
+    }
+    
+    .link-card-desc {
+        font-size: 11px;
+    }
+    
+    /* ========== 筛选面板 ========== */
+    
+    .filter-panel {
+        max-height: 70vh;
+        border-radius: 16px 16px 0 0;
+    }
+    
+    /* ========== 搜索容器 ========== */
+    
+    .search-container {
+        top: 56px;
+        width: calc(100% - 24px);
+        max-width: none;
+    }
+    
+    /* ========== Toast ========== */
+    
+    .toast-container {
+        bottom: 100px;
+        width: calc(100% - 24px);
+        max-width: 400px;
+    }
+}
+
+/* ========== 小屏幕手机 ========== */
+
+@media screen and (max-width: 375px) {
+    .sidebar {
+        width: 260px;
+    }
+    
+    .msg {
+        max-width: 95%;
+    }
+    
+    .header-btn {
+        padding: 4px 6px;
+        font-size: 16px;
+    }
+}
+
+/* ========== 横屏模式 ========== */
+
+@media screen and (max-width: 768px) and (orientation: landscape) {
+    .sidebar {
+        width: 240px;
+    }
+    
+    .messages-view {
+        padding-bottom: 80px;
+    }
+    
+    .input-area {
+        padding: 6px 12px;
+    }
+}

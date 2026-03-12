@@ -1,0 +1,43 @@
+{
+  "name": "@openclaw/teamchat",
+  "version": "1.0.0",
+  "description": "TeamChat - AI Agent 协作平台 | Web-based Multi-Agent Collaboration Platform",
+  "type": "module",
+  "main": "team_chat_server.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node team_chat_server.cjs"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "collaboration",
+    "multi-agent",
+    "openclaw",
+    "websocket",
+    "real-time"
+  ],
+  "author": "OpenClaw Team",
+  "license": "MIT",
+  "homepage": "https://github.com/openclawopenclaw/teamchat#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/openclawopenclaw/teamchat.git"
+  },
+  "bugs": {
+    "url": "https://github.com/openclawopenclaw/teamchat/issues"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "dotenv": "^17.3.1",
+    "imap": "^0.8.19"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
