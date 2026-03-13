@@ -1,38 +1,4 @@
-# Dependencies
 node_modules/
-
-# Build output
 dist/
-
-# Logs
-*.log
-team_chat_*.log
-
-# History and data files
-team_chat_history.json
-team_chat_metrics.json
-team_chat_metrics_history.json
-team_chat_daily_stats.json
-
-# Environment
 .env
-.env.local
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Temporary files
-*.bak
-*~
-tmp/
-temp/
-
-# Uploads (if used)
-uploads/
+*.log

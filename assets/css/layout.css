@@ -3403,8 +3403,15 @@ body.sidebar-collapsed .sidebar {
 }
 
 .tool-card-body {
-    padding: 8px 12px;
-    max-height: 200px;
+    padding: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease;
+}
+
+.tool-card.expanded .tool-card-body {
+    padding: 12px;
+    max-height: 500px;
     overflow-y: auto;
 }
 
@@ -3419,6 +3426,34 @@ body.sidebar-collapsed .sidebar {
     word-break: break-all;
 }
 
+.tool-section {
+    margin-bottom: 8px;
+}
+
+.tool-section:last-child {
+    margin-bottom: 0;
+}
+
+.tool-section-label {
+    font-size: 10px;
+    color: var(--text-muted, #6b7280);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tool-code {
+    margin: 0;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 11px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--text-primary, #e5e7eb);
+}
+
 .tool-result {
     margin-top: 8px;
     padding: 8px;
@@ -3428,6 +3463,171 @@ body.sidebar-collapsed .sidebar {
     color: var(--text-secondary, #a0a0b0);
     max-height: 100px;
     overflow-y: auto;
+}
+
+.tool-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.tool-card-header:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.tool-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tool-card-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tool-status-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(0, 212, 255, 0.1);
+    color: var(--text-secondary, #a0a0b0);
+}
+
+.tool-card.running .tool-status-badge {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fbbf24;
+}
+
+.tool-card.success .tool-status-badge {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.tool-card.error .tool-status-badge {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.tool-expand-icon {
+    font-size: 10px;
+    color: var(--text-muted, #6b7280);
+    transition: transform 0.3s ease;
+}
+
+.tool-card.expanded .tool-expand-icon {
+    transform: rotate(180deg);
+}
+
+.tool-spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(251, 191, 36, 0.3);
+    border-top-color: #fbbf24;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ========== 思考块样式 ========== */
+
+.thinking-block {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 12px;
+    margin: 8px 0 12px 0;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.thinking-block.expanded {
+    border-color: rgba(139, 92, 246, 0.5);
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.15);
+}
+
+.thinking-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.thinking-header:hover {
+    background: rgba(139, 92, 246, 0.1);
+}
+
+.thinking-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.thinking-icon {
+    font-size: 16px;
+}
+
+.thinking-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary, #e5e7eb);
+}
+
+.thinking-duration {
+    font-size: 11px;
+    color: var(--text-muted, #6b7280);
+    background: rgba(139, 92, 246, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.thinking-expand-icon {
+    font-size: 10px;
+    color: var(--text-muted, #6b7280);
+    transition: transform 0.3s ease;
+}
+
+.thinking-block.expanded .thinking-expand-icon {
+    transform: rotate(180deg);
+}
+
+.thinking-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.thinking-block.expanded .thinking-content {
+    max-height: 500px;
+}
+
+.thinking-text {
+    padding: 12px 14px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-secondary, #a0a0b0);
+    border-top: 1px solid rgba(139, 92, 246, 0.2);
+    background: rgba(0, 0, 0, 0.1);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* ========== 工具区域样式 ========== */
+
+.tools-section {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
 }
 
 /* ========== 会话标签样式 ========== */

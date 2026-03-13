@@ -3,7 +3,7 @@
  * 渲染用户和 Agent 消息
  */
 
-import { renderMarkdown } from './markdown.js';
+import { renderMarkdown, renderThinkingBlock, renderToolCard } from './markdown.js';
 import { escapeHtml } from '../../utils/sanitize.js';
 import { formatTimeWithDate } from '../../utils/format.js';
 import { avatarService } from '../../services/avatar.js';
@@ -22,6 +22,9 @@ export function renderMessage(msg) {
     const sessionId = msg.sessionId || msg.runId;
 
     let contentHtml = '';
+    let thinkingHtml = '';
+    let toolsHtml = '';
+    
     if (msg.image) {
         const isRemote = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
         const clickHandler = isRemote 
@@ -31,6 +34,22 @@ export function renderMessage(msg) {
     } else if (msg.file) {
         contentHtml = renderFileCard({ label: msg.file.name, token: extractToken(msg.file.url) });
     } else {
+        if (msg.thinking) {
+            thinkingHtml = renderThinkingBlock(msg.thinking);
+        }
+        
+        if (msg.tools && msg.tools.length > 0) {
+            toolsHtml = '<div class="tools-section">';
+            for (const tool of msg.tools) {
+                if (tool.type === 'tool_use') {
+                    toolsHtml += renderToolCard(tool.name, tool.params, tool.status, null);
+                } else if (tool.type === 'tool_result') {
+                    toolsHtml += renderToolCard('工具结果', null, tool.status, tool.result);
+                }
+            }
+            toolsHtml += '</div>';
+        }
+        
         contentHtml = renderMarkdown(msg.text || '');
     }
 
@@ -63,7 +82,9 @@ export function renderMessage(msg) {
                         return modelId ? `<span class="msg-model-tag" title="使用的大模型">${modelId}</span>` : '';
                     })()}
                 </div>` : ''}
+                ${thinkingHtml}
                 <div class="msg-content" data-text="${escapeHtml(msg.text || '')}">${contentHtml}</div>
+                ${toolsHtml}
                 <div class="msg-footer">
                     <div class="msg-time">${formatTimeWithDate(new Date(timestamp))}</div>
                     <div class="msg-status ${statusClass}" data-status="${status}">${statusIcon} <span class="status-text">${getStatusText(status)}</span></div>

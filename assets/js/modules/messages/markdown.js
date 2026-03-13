@@ -100,20 +100,102 @@ export function renderToolCard(toolName, params, status, result) {
     const statusClass = status === 'running' ? 'running' : (status === 'error' ? 'error' : 'success');
     const statusText = status === 'running' ? '执行中' : (status === 'error' ? '失败' : '完成');
     const icon = status === 'running' ? '🔧' : (status === 'error' ? '❌' : '✅');
+    const spinner = status === 'running' ? '<span class="tool-spinner"></span>' : '';
+    
+    const paramsJson = params ? escapeHtml(typeof params === 'string' ? params : JSON.stringify(params, null, 2)) : '';
+    const resultJson = result ? escapeHtml(typeof result === 'string' ? result : JSON.stringify(result, null, 2)) : '';
     
     return `
         <div class="tool-card ${statusClass}">
-            <div class="tool-card-header">
-                <span class="tool-icon">${icon}</span>
-                <span class="tool-name">${escapeHtml(toolName)}</span>
-                <span class="tool-status">${statusText}</span>
+            <div class="tool-card-header" onclick="this.parentElement.classList.toggle('expanded')">
+                <div class="tool-card-title">
+                    <span class="tool-icon">${icon}</span>
+                    <span class="tool-name">${escapeHtml(toolName)}</span>
+                    ${spinner}
+                </div>
+                <div class="tool-card-status">
+                    <span class="tool-status-badge">${statusText}</span>
+                    <span class="tool-expand-icon">▼</span>
+                </div>
             </div>
             <div class="tool-card-body">
-                ${params ? `<pre>${escapeHtml(typeof params === 'string' ? params : JSON.stringify(params, null, 2))}</pre>` : ''}
-                ${result ? `<div class="tool-result">${escapeHtml(typeof result === 'string' ? result : JSON.stringify(result, null, 2))}</div>` : ''}
+                ${params ? `
+                    <div class="tool-section">
+                        <div class="tool-section-label">参数</div>
+                        <pre class="tool-code">${paramsJson}</pre>
+                    </div>
+                ` : ''}
+                ${result ? `
+                    <div class="tool-section">
+                        <div class="tool-section-label">结果</div>
+                        <div class="tool-result">${resultJson}</div>
+                    </div>
+                ` : ''}
             </div>
         </div>
     `;
+}
+
+export function renderThinkingBlock(thinking, isExpanded = false) {
+    const truncated = thinking.length > 200 ? thinking.substring(0, 200) + '...' : thinking;
+    const needsExpand = thinking.length > 200;
+    
+    return `
+        <div class="thinking-block ${isExpanded ? 'expanded' : ''}">
+            <div class="thinking-header" onclick="this.parentElement.classList.toggle('expanded')">
+                <div class="thinking-title">
+                    <span class="thinking-icon">💭</span>
+                    <span class="thinking-label">思考过程</span>
+                    <span class="thinking-duration">~${Math.ceil(thinking.length / 100)}s</span>
+                </div>
+                <span class="thinking-expand-icon">▼</span>
+            </div>
+            <div class="thinking-content">
+                <div class="thinking-text">${escapeHtml(thinking)}</div>
+            </div>
+        </div>
+    `;
+}
+
+export function renderMessageBlocks(content) {
+    if (!Array.isArray(content)) {
+        return { thinking: null, tools: [], text: '' };
+    }
+    
+    let thinking = null;
+    const tools = [];
+    let text = '';
+    
+    for (const block of content) {
+        if (!block || typeof block !== 'object') continue;
+        
+        if (block.type === 'thinking' && typeof block.thinking === 'string') {
+            thinking = block.thinking;
+        }
+        
+        if (block.type === 'tool_use') {
+            tools.push({
+                type: 'tool_use',
+                name: block.name || 'unknown',
+                params: block.input || {},
+                status: 'running'
+            });
+        }
+        
+        if (block.type === 'tool_result') {
+            tools.push({
+                type: 'tool_result',
+                result: block.content || '',
+                status: block.is_error ? 'error' : 'success'
+            });
+        }
+        
+        if (block.type === 'text') {
+            text += block.text || '';
+        }
+    }
+    
+    return { thinking, tools, text };
 }
 
 export function renderFileCard({ label, token }) {

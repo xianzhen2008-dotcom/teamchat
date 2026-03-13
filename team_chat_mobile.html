@@ -821,7 +821,7 @@
             <div class="status-dot" id="status"></div>
             <button class="header-btn" id="moreBtn" title="更多">⋯</button>
             <div class="header-dropdown" id="headerDropdown">
-                <a href="/team_chat.html" class="dropdown-item">
+                <a href="/team_chat.html" class="dropdown-item" target="_blank">
                     <span class="dropdown-icon">🖥️</span>
                     <span>桌面版</span>
                 </a>
@@ -896,17 +896,17 @@
             let pendingFiles = [];
             
             const agents = [
-                { id: 'lobster', agentId: 'main', name: '小龙虾', role: '总助 / COO', color: 'var(--cyber-red)', img: '小龙虾.png' },
-                { id: 'dev', agentId: 'dev', name: '小码', role: '开发主管', color: 'var(--cyber-purple)', img: '小码.png' },
+                { id: 'lobster', agentId: 'main', name: 'Agent 1', role: '角色 1', color: 'var(--cyber-red)', img: 'agent-default.png' },
+                { id: 'dev', agentId: 'dev', name: 'Agent 2', role: '角色 2', color: 'var(--cyber-purple)', img: 'agent-default.png' },
                 { id: 'pm', agentId: 'pm', name: '小产', role: '产品经理', color: '#ff6b6b', img: '小产.png' },
                 { id: 'frontend', agentId: 'frontend', name: '小前', role: '前端开发', color: '#61affe', img: '小前.png' },
                 { id: 'backend', agentId: 'backend', name: '小后', role: '后端开发', color: '#49cc90', img: '小后.png' },
                 { id: 'devops', agentId: 'devops', name: '小运', role: '运维部署', color: '#fca130', img: '小运.png' },
                 { id: 'qa', agentId: 'qa', name: '小测', role: '测试验证', color: '#9012fe', img: '小测.png' },
                 { id: 'mobile', agentId: 'mobile', name: '小移', role: '移动端', color: '#0db7ed', img: '小移.png' },
-                { id: 'mail', agentId: 'mail', name: '小邮', role: '商务专家', color: '#e3b341', img: '小邮.png' },
+                { id: 'mail', agentId: 'mail', name: 'Agent 3', role: '角色 3', color: '#e3b341', img: 'agent-default.png' },
                 { id: 'writer', agentId: 'writer', name: '小文', role: '创意策划', color: '#f778ba', img: '小文2.png' },
-                { id: 'data', agentId: 'data', name: '小数', role: '数据分析', color: '#388bfd', img: '小数.png' },
+                { id: 'data', agentId: 'data', name: 'Agent 4', role: '角色 4', color: '#388bfd', img: 'agent-default.png' },
                 { id: 'finance', agentId: 'finance', name: '小财', role: '财经投资', color: '#3fb950', img: '小财.png' }
             ];
             
@@ -1268,7 +1268,7 @@
                     
                     let inner = '';
                     if (!msg.isUser) {
-                        const agent = agents.find(a => a.name === msg.sender) || { img: '小龙虾.png', color: 'var(--accent)' };
+                        const agent = agents.find(a => a.name === msg.sender) || { img: 'agent-default.png', color: 'var(--accent)' };
                         const avatarUrl = AvatarCache.getUrl(agent.img);
                         inner += `<div class="message-avatar" style="background-image: url('${avatarUrl}')"></div>`;
                     }
@@ -1406,7 +1406,7 @@
                     const runId = p.runId;
                     const state = p.state;
                     const sessionKey = p.sessionKey;
-                    const agent = getAgentBySessionKey(sessionKey) || { name: 'Agent', img: '小龙虾.png' };
+                    const agent = getAgentBySessionKey(sessionKey) || { name: 'Agent', img: 'agent-default.png' };
                     const text = p?.message?.content?.find?.(c => c?.type === 'text')?.text;
                     
                     if (!runId) return;

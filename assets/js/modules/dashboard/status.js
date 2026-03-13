@@ -149,33 +149,57 @@ export class StatusDashboard {
         }
     }
 
-    onThinking({ agentId, thought }) {
+    onThinking({ agentId, content, thought }) {
+        const thinkingContent = content || thought;
+        if (!thinkingContent) return;
+        
         this.addLog(agentId, {
             type: 'thinking',
             icon: '🧠',
             title: '思考中',
-            content: thought,
+            content: thinkingContent,
             time: Date.now()
+        });
+        
+        stateManager.addAgentLog(agentId, {
+            text: '🧠 思考: ' + thinkingContent.substring(0, 80),
+            type: 'thinking'
         });
     }
 
-    onToolCall({ agentId, toolName, toolArgs }) {
+    onToolCall({ agentId, tool, toolName, params, toolArgs }) {
+        const name = tool || toolName;
+        const args = params || toolArgs;
+        
         this.addLog(agentId, {
             type: 'tool_call',
             icon: '🔧',
             title: '调用工具',
-            content: `${toolName}(${JSON.stringify(toolArgs, null, 2)})`,
+            content: `${name}(${JSON.stringify(args, null, 2)})`,
             time: Date.now()
+        });
+        
+        stateManager.addAgentLog(agentId, {
+            text: '🔧 调用: ' + name,
+            type: 'tool'
         });
     }
 
-    onToolResult({ agentId, toolName, result }) {
+    onToolResult({ agentId, tool, toolName, result, content }) {
+        const name = tool || toolName;
+        const resultContent = result || content;
+        
         this.addLog(agentId, {
             type: 'tool_result',
             icon: '✓',
             title: '工具返回',
-            content: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
+            content: typeof resultContent === 'string' ? resultContent : JSON.stringify(resultContent, null, 2),
             time: Date.now()
+        });
+        
+        stateManager.addAgentLog(agentId, {
+            text: '✓ 工具返回: ' + (typeof resultContent === 'string' ? resultContent.substring(0, 50) : '完成'),
+            type: 'success'
         });
     }
 

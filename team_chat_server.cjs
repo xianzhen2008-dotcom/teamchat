@@ -24,8 +24,8 @@ const {
 } = require("./email_sync_service.cjs");
 
 // 企微 Webhook 通知模块
-const WEBHOOK_URL = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=8603f9a7-daf6-467f-b8e3-beeedafcaf5e';
-const WECOM_NOTIFY_ENABLED = false; // 已禁用企微通知
+const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
+const WECOM_NOTIFY_ENABLED = process.env.WECOM_NOTIFY_ENABLED === 'true'; // 已禁用企微通知
 
 // ===== 基础路径定义 =====
 const BASE_DIR = __dirname;
@@ -826,6 +826,135 @@ function readTunnelUrl() {
 TEAMCHAT_TUNNEL_URL = readTunnelUrl();
 console.log(`[TeamChat Tunnel] ${TEAMCHAT_TUNNEL_URL || '(未配置)'}`);
 
+// ===== Tunnel 自动检测和重启 =====
+let tunnelLastRestartTime = 0;
+const TUNNEL_RESTART_COOLDOWN = 60000; // 1分钟内不重复重启
+
+async function checkTunnelStatus() {
+    try {
+        const { execSync } = require('child_process');
+        
+        // 检查 cloudflared 进程是否运行
+        const result = execSync('pgrep -f "cloudflared" | head -1', { encoding: 'utf-8' }).trim();
+        const isRunning = !!result;
+        
+        // 如果配置了固定域名，检查域名是否可访问
+        if (TEAMCHAT_TUNNEL_URL && TEAMCHAT_TUNNEL_URL.startsWith('https://')) {
+            try {
+                const https = require('https');
+                const response = await new Promise((resolve) => {
+                    const req = https.get(TEAMCHAT_TUNNEL_URL, { timeout: 5000 }, (res) => {
+                        resolve(res.statusCode);
+                    });
+                    req.on('error', () => resolve(0));
+                    req.on('timeout', () => { req.destroy(); resolve(0); });
+                });
+                
+                // 如果域名可访问，说明隧道正常
+                if (response === 200 || response === 302) {
+                    return true;
+                }
+            } catch (e) {
+                // 域名不可访问
+            }
+        }
+        
+        return isRunning;
+    } catch (e) {
+        return false;
+    }
+}
+
+async function restartTunnel() {
+    const now = Date.now();
+    if (now - tunnelLastRestartTime < TUNNEL_RESTART_COOLDOWN) {
+        console.log('[Tunnel Auto] Restart cooldown, skipping...');
+        return;
+    }
+    
+    tunnelLastRestartTime = now;
+    console.log('[Tunnel Auto] Tunnel not responding, attempting restart...');
+    
+    try {
+        const { execSync } = require('child_process');
+        
+        // 停止旧的 cloudflared 进程
+        execSync('pkill -f "cloudflared" 2>/dev/null || true', { timeout: 5000 });
+        
+        await new Promise(r => setTimeout(r, 2000));
+        
+        // 启动新的 tunnel（使用固定域名配置）
+        const tunnelLogPath = path.join(OPENCLAW_HOME, 'tunnel_team_chat.log');
+        
+        // 检查是否配置了固定域名
+        const isFixedDomain = TEAMCHAT_TUNNEL_URL && TEAMCHAT_TUNNEL_URL.includes('qzz.io');
+        
+        let cmd;
+        if (isFixedDomain) {
+            // 使用固定域名隧道
+            cmd = `nohup cloudflared tunnel run --hostname teamchat.qzz.io --url http://localhost:18788 ef6a19d5-0a69-49d2-9193-0e7ba14fa56a > "${tunnelLogPath}" 2>&1 &`;
+        } else {
+            // 使用临时域名
+            cmd = `nohup cloudflared tunnel --url http://localhost:18788 > "${tunnelLogPath}" 2>&1 &`;
+        }
+        
+        execSync(cmd, { shell: true, detached: true, stdio: 'ignore' });
+        
+        console.log('[Tunnel Auto] Restart command sent, waiting for connection...');
+        
+        // 等待隧道启动
+        await new Promise(r => setTimeout(r, 10000));
+        
+        // 验证是否启动成功
+        const isNowRunning = await checkTunnelStatus();
+        if (isNowRunning) {
+            console.log('[Tunnel Auto] Tunnel restarted successfully');
+            notifyWecom('🔄 TeamChat 隧道已自动恢复');
+        } else {
+            console.log('[Tunnel Auto] Tunnel restart may have failed, will retry next check');
+        }
+        
+    } catch (e) {
+        console.error('[Tunnel Auto] Restart failed:', e.message);
+    }
+}
+
+function startTunnelAutoRecovery() {
+    console.log('[Tunnel Auto] Starting tunnel auto-recovery monitor...');
+    
+    // 每 60 秒检查一次隧道状态
+    setInterval(async () => {
+        const isRunning = await checkTunnelStatus();
+        
+        if (!isRunning) {
+            console.log('[Tunnel Auto] Tunnel not responding, checking domain...');
+            
+            // 如果配置了固定域名，先检查域名是否可访问
+            if (TEAMCHAT_TUNNEL_URL && TEAMCHAT_TUNNEL_URL.includes('qzz.io')) {
+                try {
+                    const https = require('https');
+                    const response = await new Promise((resolve) => {
+                        const req = https.get(TEAMCHAT_TUNNEL_URL, { timeout: 5000 }, (res) => {
+                            resolve(res.statusCode);
+                        });
+                        req.on('error', () => resolve(0));
+                        req.on('timeout', () => { req.destroy(); resolve(0); });
+                    });
+                    
+                    if (response === 200 || response === 302) {
+                        console.log('[Tunnel Auto] Domain is accessible, no restart needed');
+                        return;
+                    }
+                } catch (e) {
+                    console.log('[Tunnel Auto] Domain check failed, will restart tunnel');
+                }
+            }
+            
+            await restartTunnel();
+        }
+    }, 60000);
+}
+
 // 监听隧道文件变化
 let tunnelWatcher = null;
 let lastTunnelNotifyTime = 0;
@@ -1239,7 +1368,14 @@ async function saveHistory(history, notify = false) {
   historyCacheTime = Date.now();
   historyDirty = true;
   
-  scheduleHistorySave();
+  // 立即保存到文件，避免重启时丢失
+  try {
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const filtered = historyCache.filter(msg => msg.timestamp > thirtyDaysAgo);
+    await fsp.writeFile(HISTORY_FILE, JSON.stringify(filtered.slice(-10000), null, 2));
+  } catch (e) {
+    console.error('[HISTORY SAVE ERROR]', e.message);
+  }
 }
 
 // Agent 状态数据缓存
@@ -2391,7 +2527,7 @@ if (urlPath === "/api/admin/clear-cache" && method === "POST") {
 
   // 静态文件和公开 API 路径
   const isStaticFile = /\.(html|js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/i.test(urlPath);
-  const isPublicApi = urlPath === '/api/login' || urlPath === '/api/check-auth' || urlPath === '/api/health' || urlPath === '/api/mail-tunnel' || urlPath === '/api/tunnel' || urlPath === '/api/agent-logs/stream' || urlPath.startsWith('/api/agent/') || urlPath === '/api/broadcast' || urlPath === '/api/file/path' || urlPath.startsWith('/api/trae/') || urlPath.startsWith('/api/muse/') || urlPath === '/api/system-metrics' || urlPath === '/api/agents' || urlPath === '/api/agents/status' || urlPath.startsWith('/api/sessions') || urlPath.startsWith('/api/ops/') || urlPath === '/history' || urlPath === '/api/model-stats' || urlPath.startsWith('/css/') || urlPath.startsWith('/assets/') || urlPath.startsWith('/images/');
+  const isPublicApi = urlPath === '/api/login' || urlPath === '/api/check-auth' || urlPath === '/api/health' || urlPath === '/api/mail-tunnel' || urlPath === '/api/tunnel' || urlPath === '/api/agent-logs/stream' || urlPath.startsWith('/api/agent/') || urlPath === '/api/broadcast' || urlPath === '/api/file/path' || urlPath.startsWith('/api/trae/') || urlPath.startsWith('/api/muse/') || urlPath === '/api/system-metrics' || urlPath === '/api/agents' || urlPath === '/api/agents/status' || urlPath.startsWith('/api/sessions') || urlPath.startsWith('/api/ops/') || urlPath === '/history' || urlPath === '/api/model-stats' || urlPath === '/api/export-history' || urlPath.startsWith('/css/') || urlPath.startsWith('/assets/') || urlPath.startsWith('/images/');
 
   // 本地访问或已登录用户允许访问
   if (!isLocal && !hasValidSession && !isPublicApi) {
@@ -2460,6 +2596,20 @@ if (urlPath === "/api/admin/clear-cache" && method === "POST") {
   // 模型使用统计 API
 if (urlPath === "/api/model-stats" && method === "GET") {
   return handleModelStats(req, res);
+}
+
+if (urlPath === "/api/export-history" && method === "GET") {
+  const history = await loadHistory();
+  let md = "# TeamChat 历史消息\n\n";
+  for (const msg of history) {
+    const time = new Date(msg.timestamp).toLocaleString('zh-CN');
+    md += `## ${msg.sender} - ${time}\n\n${msg.text}\n\n---\n\n`;
+  }
+  res.writeHead(200, {
+    "Content-Type": "text/markdown; charset=utf-8",
+    "Content-Disposition": "attachment; filename=teamchat-history.md"
+  });
+  return res.end(md);
 }
 
 // 会话列表 API
@@ -2696,9 +2846,21 @@ if (urlPath === "/api/admin/clear-cache" && method === "POST") {
           isSystem: true
         };
         
-        // 添加到历史
+        // 添加到历史并立即保存
         historyCache.push(broadcastMsg);
         historyDirty = true;
+        
+        // 立即保存到文件，避免重启时丢失
+        (async () => {
+            try {
+                const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+                const filtered = historyCache.filter(msg => msg.timestamp > thirtyDaysAgo);
+                await fsp.writeFile(HISTORY_FILE, JSON.stringify(filtered.slice(-10000), null, 2));
+                console.log(`[Broadcast] Message saved immediately`);
+            } catch (e) {
+                console.error('[Broadcast] Save error:', e.message);
+            }
+        })();
         
         // 通过 SSE 广播给所有客户端
         const sseData = `data: ${JSON.stringify({ type: 'broadcast', data: broadcastMsg })}\n\n`;
@@ -3646,6 +3808,9 @@ server.listen(PORT, "0.0.0.0", async () => {
   
   // 启动邮件同步服务
   initEmailSyncService();
+  
+  // 启动 Tunnel 自动检测和重启
+  startTunnelAutoRecovery();
   
   // 启动时发送密码到企微
   const startupTunnelUrl = getLatestTunnelUrl();

@@ -12,7 +12,6 @@ import { state } from './state.js';
 import { eventBus, EventTypes, emit, on, once } from './events.js';
 import { apiService } from '../services/api.js';
 import { messagesModule } from '../modules/messages/index.js';
-import { renderToolCard } from '../modules/messages/markdown.js';
 
 const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 // 开发环境下使用代理，生产环境使用当前 host
@@ -523,53 +522,58 @@ class App {
         const content = payload?.message?.content;
         const text = Array.isArray(content) ? content.find(c => c?.type === 'text')?.text : (typeof content === 'string' ? content : null);
         
-        // 从 message 对象中提取 model 字段
         const model = payload?.message?.model || null;
 
         if (!runId) return;
 
-        // 解析并触发日志事件，同时构建工具卡片 HTML
-        let toolCardsHtml = '';
+        let thinking = null;
+        const tools = [];
+        
         if (Array.isArray(content)) {
             for (const block of content) {
                 if (!block || typeof block !== 'object') continue;
                 
-                if (block.type === 'thinking' && typeof block.thinking === 'string') {
-                    emit('agent:thinking', { agentId: senderAgentId, content: block.thinking });
+                if ((block.type === 'thinking' || block.type === 'thought') && (block.thinking || block.thought)) {
+                    thinking = block.thinking || block.thought;
+                    emit('agent:thinking', { agentId: senderAgentId, content: thinking });
                 }
                 
                 if (block.type === 'tool_use') {
+                    tools.push({
+                        type: 'tool_use',
+                        name: block.name || 'unknown',
+                        params: block.input || {},
+                        status: 'running'
+                    });
                     emit('agent:tool_call', { 
                         agentId: senderAgentId, 
                         tool: block.name || 'unknown', 
                         params: block.input || {} 
                     });
-                    // 添加工具调用卡片
-                    toolCardsHtml += renderToolCard(block.name || 'unknown', block.input || {}, 'running', null);
                 }
                 
                 if (block.type === 'tool_result') {
+                    tools.push({
+                        type: 'tool_result',
+                        result: block.content || '',
+                        status: block.is_error ? 'error' : 'success'
+                    });
                     emit('agent:tool_result', { 
                         agentId: senderAgentId, 
                         tool: block.tool_use_id || 'unknown', 
                         result: block.content || '' 
                     });
-                    // 添加工具结果卡片
-                    toolCardsHtml += renderToolCard('工具结果', null, block.is_error ? 'error' : 'success', block.content || '');
                 }
             }
         }
 
-        // 如果有工具卡片，附加到消息文本后面
-        const fullText = text ? (toolCardsHtml ? text + '\n' + toolCardsHtml : text) : toolCardsHtml;
-
         if (msgState === 'delta' && typeof text === 'string') {
-            this._handleDeltaMessage(runId, sender, senderAgentId, fullText || text, model);
+            this._handleDeltaMessage(runId, sender, senderAgentId, text, model, thinking, tools);
             return;
         }
 
         if (msgState === 'final') {
-            this._handleFinalMessage(runId, sender, senderAgentId, fullText || text, model);
+            this._handleFinalMessage(runId, sender, senderAgentId, text, model, thinking, tools);
             return;
         }
 
@@ -595,7 +599,7 @@ class App {
         }
     }
 
-    _handleDeltaMessage(runId, sender, senderAgentId, text, model) {
+    _handleDeltaMessage(runId, sender, senderAgentId, text, model, thinking = null, tools = []) {
         let entry = this.runMessageEls.get(runId);
 
         if (!entry) {
@@ -604,7 +608,7 @@ class App {
                 return;
             }
 
-            entry = { sender, text: '', lastRenderTime: 0, sessionId: runId };
+            entry = { sender, text: '', lastRenderTime: 0, sessionId: runId, thinking, tools };
             this.runMessageEls.set(runId, entry);
 
             if (senderAgentId) {
@@ -615,17 +619,19 @@ class App {
                 emit(EventTypes.AGENT_BUSY, { agentId: senderAgentId });
             }
         }
-
+        
+        if (thinking) entry.thinking = thinking;
+        if (tools.length > 0) entry.tools = tools;
         entry.text = text;
 
         const now = Date.now();
         if (now - entry.lastRenderTime > 50) {
-            messagesModule.updateStreamingMessage(runId, text, sender, senderAgentId, model);
+            messagesModule.updateStreamingMessage(runId, text, sender, senderAgentId, model, thinking, tools);
             entry.lastRenderTime = now;
         }
     }
 
-    _handleFinalMessage(runId, sender, senderAgentId, text, model) {
+    _handleFinalMessage(runId, sender, senderAgentId, text, model, thinking = null, tools = []) {
         const finalText = typeof text === 'string' ? text.trim() : '';
         const entry = this.runMessageEls.get(runId);
 
@@ -652,7 +658,7 @@ class App {
 
         if (entry) {
             if (finalText) {
-                messagesModule.finalizeStreamingMessage(runId, finalText, model);
+                messagesModule.finalizeStreamingMessage(runId, finalText, model, entry.thinking || thinking, entry.tools || tools);
             }
             this.runMessageEls.delete(runId);
             this.processedMessageIds.add(runId);
@@ -663,7 +669,9 @@ class App {
                 isUser: false,
                 type: 'final',
                 model: model || null,
-                sessionId: runId
+                sessionId: runId,
+                thinking: thinking,
+                tools: tools
             });
         }
     }

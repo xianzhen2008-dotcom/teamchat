@@ -310,7 +310,7 @@ class MessagesModule {
         }
     }
 
-    updateStreamingMessage(runId, text, sender, senderAgentId, model) {
+    updateStreamingMessage(runId, text, sender, senderAgentId, model, thinking = null, tools = []) {
         if (!this.container) return;
 
         const msgEl = this.container.querySelector(`[data-run-id="${runId}"]`);
@@ -334,23 +334,25 @@ class MessagesModule {
                 }
             }
             
-            // 更新 state 中的消息
             const messages = stateManager.getState('messages') || [];
             const idx = messages.findIndex(m => m.runId === runId);
             if (idx >= 0) {
                 messages[idx].text = text;
                 if (model) messages[idx].model = model;
+                if (thinking) messages[idx].thinking = thinking;
+                if (tools.length > 0) messages[idx].tools = tools;
                 stateManager.setState('messages', messages);
-                // 不在流式更新时保存，避免频繁写入 localStorage
             } else {
-                // 如果 state 中没有这条消息，添加它
                 messages.push({
                     sender: sender || 'Agent',
                     text,
                     isUser: false,
                     runId,
+                    sessionId: runId,
                     timestamp: Date.now(),
-                    model
+                    model,
+                    thinking,
+                    tools
                 });
                 stateManager.setState('messages', messages);
             }
@@ -369,7 +371,9 @@ class MessagesModule {
             runId,
             sessionId: runId,
             timestamp: Date.now(),
-            model
+            model,
+            thinking,
+            tools
         };
         
         if (senderAgentId) {
@@ -397,7 +401,7 @@ class MessagesModule {
         }
     }
 
-    finalizeStreamingMessage(runId, text, model) {
+    finalizeStreamingMessage(runId, text, model, thinking = null, tools = []) {
         if (!this.container) return;
 
         const msgEl = this.container.querySelector(`[data-run-id="${runId}"]`);
@@ -426,9 +430,9 @@ class MessagesModule {
         const idx = messages.findIndex(m => m.runId === runId);
         if (idx >= 0) {
             messages[idx].text = text;
-            if (model) {
-                messages[idx].model = model;
-            }
+            if (model) messages[idx].model = model;
+            if (thinking) messages[idx].thinking = thinking;
+            if (tools.length > 0) messages[idx].tools = tools;
             stateManager.setState('messages', messages);
             this.saveHistory(messages);
         }

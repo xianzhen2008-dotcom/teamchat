@@ -1,10 +1,10 @@
 const axios = require('axios');
 
 const TEAMCHAT_URL = 'http://127.0.0.1:18788';
-const AUTH_TOKEN = 'ea5e7558c8696733ecde31f495d8c26bb24147eca5bf3c61';
-const WEBHOOK_URL = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=8603f9a7-daf6-467f-b8e3-beeedafcaf5e';
+const AUTH_TOKEN = process.env.TEAMCHAT_AUTH_TOKEN || '';
+const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
 
-const LOG_FILE = "/Users/wusiwei/.openclaw/wecom_teamchat_monitor.log";
+const LOG_FILE = "./wecom_teamchat_monitor.log";
 let lastTimestamp = 0;
 
 function log(msg) {
