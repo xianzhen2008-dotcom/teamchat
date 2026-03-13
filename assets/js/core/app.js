@@ -604,13 +604,14 @@ class App {
                 return;
             }
 
-            entry = { sender, text: '', lastRenderTime: 0 };
+            entry = { sender, text: '', lastRenderTime: 0, sessionId: runId };
             this.runMessageEls.set(runId, entry);
 
             if (senderAgentId) {
                 state.clearPendingTimer(senderAgentId);
                 state.addAgentRun(senderAgentId, runId);
                 state.setAgentBusy(senderAgentId);
+                state.addOrUpdateSession(runId, senderAgentId, sender);
                 emit(EventTypes.AGENT_BUSY, { agentId: senderAgentId });
             }
         }
@@ -639,6 +640,7 @@ class App {
             }
 
             state.setLastSpeaker(sender);
+            state.addOrUpdateSession(runId, senderAgentId, sender);
 
             if (finalText) {
                 state.addAgentLog(senderAgentId, {
@@ -660,7 +662,8 @@ class App {
                 text: finalText,
                 isUser: false,
                 type: 'final',
-                model: model || null
+                model: model || null,
+                sessionId: runId
             });
         }
     }

@@ -17,6 +17,7 @@ class MessagesModule {
         this.initialized = false;
         this.isNearBottom = true;
         this.scrollLocked = false;
+        this.replyToMessage = null;
     }
 
     init(options = {}) {
@@ -35,6 +36,16 @@ class MessagesModule {
         eventBus.on('message:sent', this.onMessageSent.bind(this));
         eventBus.on('state:changed:messages', this.render.bind(this));
         eventBus.on('filter:changed', this.onFilterChanged.bind(this));
+        eventBus.on('reply:request', this.handleReplyRequest.bind(this));
+        eventBus.on('reply:clear', this.clearReply.bind(this));
+        eventBus.on('session:selected', ({ sessionId }) => this.highlightMessagesBySession(sessionId));
+        
+        window.addEventListener('session:reply', (e) => {
+            const { sessionId } = e.detail;
+            if (sessionId) {
+                this.replyToSession(sessionId);
+            }
+        });
 
         return this;
     }
@@ -61,6 +72,17 @@ class MessagesModule {
     }
 
     handleClick(e) {
+        // 处理会话标签点击
+        const sessionTag = e.target.closest('.session-tag');
+        if (sessionTag) {
+            const sessionId = sessionTag.dataset.sessionId;
+            if (sessionId) {
+                this.highlightMessagesBySession(sessionId);
+                eventBus.emit('session:selected', { sessionId });
+            }
+            return;
+        }
+
         // 处理头像点击 - 自动@
         const avatar = e.target.closest('.msg-avatar[data-sender]');
         if (avatar) {
@@ -97,6 +119,27 @@ class MessagesModule {
         }
     }
 
+    highlightMessagesBySession(sessionId) {
+        if (!this.container) return;
+        
+        const messages = this.container.querySelectorAll('.msg');
+        messages.forEach(msg => {
+            msg.classList.remove('session-highlight');
+            if (msg.dataset.sessionId === sessionId) {
+                msg.classList.add('session-highlight');
+                msg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+        
+        const session = stateManager.getSession(sessionId);
+        if (session) {
+            eventBus.emit('toast:show', { 
+                message: `已定位到会话 #${sessionId.slice(0, 8)}`, 
+                type: 'info' 
+            });
+        }
+    }
+
     handleScroll() {
         if (!this.container) return;
         
@@ -115,6 +158,98 @@ class MessagesModule {
     onFilterChanged(filter) {
         this.activeFilter = filter;
         this.render();
+    }
+
+    handleReplyRequest({ text, sender }) {
+        this.replyToMessage = { text, sender };
+        stateManager.setReplyTo({ text, sender });
+        
+        const input = document.getElementById('chat-input');
+        if (input) {
+            input.focus();
+            const replyPreview = document.querySelector('.reply-preview');
+            if (!replyPreview) {
+                const preview = document.createElement('div');
+                preview.className = 'reply-preview';
+                preview.innerHTML = `
+                    <div class="reply-preview-content">
+                        <span class="reply-preview-label">回复 ${sender}:</span>
+                        <span class="reply-preview-text">${text.substring(0, 50)}${text.length > 50 ? '...' : ''}</span>
+                    </div>
+                    <button class="reply-preview-close" title="取消引用">✕</button>
+                `;
+                preview.querySelector('.reply-preview-close').addEventListener('click', () => {
+                    this.clearReply();
+                });
+                input.parentElement.parentElement.insertBefore(preview, input.parentElement);
+            } else {
+                replyPreview.querySelector('.reply-preview-label').textContent = `回复 ${sender}:`;
+                replyPreview.querySelector('.reply-preview-text').textContent = text.substring(0, 50) + (text.length > 50 ? '...' : '');
+            }
+        }
+    }
+
+    clearReply() {
+        this.replyToMessage = null;
+        stateManager.clearReplyTo();
+        
+        const replyPreview = document.querySelector('.reply-preview');
+        if (replyPreview) {
+            replyPreview.remove();
+        }
+    }
+
+    replyToSession(sessionId) {
+        const messages = stateManager.getState('messages') || [];
+        const sessionMessages = messages.filter(m => m.sessionId === sessionId || m.runId === sessionId);
+        
+        if (sessionMessages.length === 0) {
+            eventBus.emit('toast:show', { message: '找不到该会话的消息', type: 'warning' });
+            return;
+        }
+        
+        const lastMessage = sessionMessages[sessionMessages.length - 1];
+        const shortId = sessionId.slice(0, 8);
+        
+        this.replyToMessage = { 
+            text: lastMessage.text, 
+            sender: lastMessage.sender,
+            sessionId: sessionId
+        };
+        stateManager.setReplyTo(this.replyToMessage);
+        
+        const input = document.getElementById('chat-input');
+        if (input) {
+            input.focus();
+            
+            const replyPreview = document.querySelector('.reply-preview');
+            if (!replyPreview) {
+                const preview = document.createElement('div');
+                preview.className = 'reply-preview';
+                preview.innerHTML = `
+                    <div class="reply-preview-content">
+                        <span class="reply-preview-label">回复会话 #sess-${shortId}:</span>
+                        <span class="reply-preview-text">${lastMessage.text.substring(0, 50)}${lastMessage.text.length > 50 ? '...' : ''}</span>
+                    </div>
+                    <button class="reply-preview-close" title="取消引用">✕</button>
+                `;
+                preview.querySelector('.reply-preview-close').addEventListener('click', () => {
+                    this.clearReply();
+                });
+                input.parentElement.parentElement.insertBefore(preview, input.parentElement);
+            } else {
+                replyPreview.querySelector('.reply-preview-label').textContent = `回复会话 #sess-${shortId}:`;
+                replyPreview.querySelector('.reply-preview-text').textContent = lastMessage.text.substring(0, 50) + (lastMessage.text.length > 50 ? '...' : '');
+            }
+            
+            eventBus.emit('toast:show', { message: `已选择会话 #sess-${shortId}，输入消息后将回复此会话`, type: 'info' });
+        }
+        
+        this.highlightMessagesBySession(sessionId);
+    }
+
+    getReplyTo() {
+        return this.replyToMessage;
     }
 
     addMessage(msg) {
@@ -232,6 +367,7 @@ class MessagesModule {
             text,
             isUser: false,
             runId,
+            sessionId: runId,
             timestamp: Date.now(),
             model
         };

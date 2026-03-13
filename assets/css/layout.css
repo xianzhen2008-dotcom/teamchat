@@ -3429,3 +3429,250 @@ body.sidebar-collapsed .sidebar {
     max-height: 100px;
     overflow-y: auto;
 }
+
+/* ========== 会话标签样式 ========== */
+
+.session-tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 10px;
+    color: var(--cyber-blue, #00d4ff);
+    background: rgba(0, 212, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+}
+
+.session-tag:hover {
+    background: rgba(0, 212, 255, 0.2);
+    box-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+}
+
+/* ========== 会话高亮样式 ========== */
+
+.msg.session-highlight {
+    animation: session-highlight-pulse 2s ease-out;
+}
+
+@keyframes session-highlight-pulse {
+    0% {
+        background: rgba(0, 212, 255, 0.15);
+        box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+    }
+    100% {
+        background: transparent;
+        box-shadow: none;
+    }
+}
+
+/* ========== 会话列表样式 ========== */
+
+.session-section {
+    padding: 8px;
+    border-top: 1px solid var(--border-color, rgba(0, 212, 255, 0.15));
+    margin-top: 8px;
+}
+
+.session-header {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary, #a0a0b0);
+    padding: 8px 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.session-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.session-empty {
+    text-align: center;
+    padding: 16px 8px;
+    color: var(--text-secondary, #a0a0b0);
+    font-size: 12px;
+    opacity: 0.6;
+}
+
+.session-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.session-item:hover {
+    background: rgba(0, 212, 255, 0.1);
+    border-color: rgba(0, 212, 255, 0.2);
+}
+
+.session-item:active {
+    transform: scale(0.98);
+}
+
+.session-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-size: cover;
+    background-position: center;
+    background-color: #333;
+    flex-shrink: 0;
+}
+
+.session-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.session-agent {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary, #ffffff);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.session-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+}
+
+.session-id {
+    color: var(--cyber-blue, #00d4ff);
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+}
+
+.session-time {
+    color: var(--text-secondary, #a0a0b0);
+}
+
+.session-count {
+    font-size: 11px;
+    color: var(--text-secondary, #a0a0b0);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+}
+
+/* ========== 回复预览样式 ========== */
+
+.reply-preview {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(0, 212, 255, 0.08);
+    border: 1px solid rgba(0, 212, 255, 0.15);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    animation: slideIn 0.2s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.reply-preview-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.reply-preview-label {
+    font-size: 11px;
+    color: var(--cyber-blue, #00d4ff);
+    font-weight: 500;
+}
+
+.reply-preview-text {
+    font-size: 12px;
+    color: var(--text-secondary, #a0a0b0);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.reply-preview-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary, #a0a0b0);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    margin-left: 8px;
+}
+
+.reply-preview-close:hover {
+    background: rgba(241, 91, 181, 0.2);
+    color: #f15bb5;
+}
+
+/* ========== 移动端会话列表适配 ========== */
+
+@media screen and (max-width: 768px) {
+    .session-section {
+        padding: 6px;
+    }
+
+    .session-header {
+        font-size: 11px;
+        padding: 6px 4px;
+    }
+
+    .session-list {
+        max-height: 150px;
+    }
+
+    .session-item {
+        padding: 6px 8px;
+    }
+
+    .session-avatar {
+        width: 28px;
+        height: 28px;
+    }
+
+    .session-agent {
+        font-size: 12px;
+    }
+
+    .session-meta {
+        font-size: 10px;
+    }
+
+    .session-count {
+        font-size: 10px;
+    }
+}

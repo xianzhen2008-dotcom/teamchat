@@ -871,6 +871,48 @@ function getLatestTunnelUrl() {
 const SESSION_SECRET = crypto.randomBytes(32).toString('hex');
 const activeSessions = new Map(); // sessionId -> { createdAt, lastAccess }
 
+// ===== 会话管理 =====
+const chatSessions = new Map(); // sessionId -> { sessionId, agentId, agentName, lastMessage, lastMessageTime, messageCount, createdAt }
+
+function updateChatSession(msg) {
+  if (!msg.sender || msg.isUser) return;
+  
+  const agentId = msg.agentId || msg.sender;
+  const sessionId = msg.sessionId || `session-${agentId}-${Date.now()}`;
+  
+  const existingSession = chatSessions.get(sessionId);
+  const truncatedMessage = (msg.text || '').substring(0, 100);
+  
+  if (existingSession) {
+    existingSession.lastMessage = truncatedMessage;
+    existingSession.lastMessageTime = msg.timestamp || Date.now();
+    existingSession.messageCount++;
+  } else {
+    chatSessions.set(sessionId, {
+      sessionId,
+      agentId,
+      agentName: getAgentDisplayName(agentId),
+      lastMessage: truncatedMessage,
+      lastMessageTime: msg.timestamp || Date.now(),
+      messageCount: 1,
+      createdAt: msg.timestamp || Date.now()
+    });
+  }
+  
+  return sessionId;
+}
+
+function getChatSessions() {
+  const sessions = Array.from(chatSessions.values());
+  sessions.sort((a, b) => b.lastMessageTime - a.lastMessageTime);
+  return sessions;
+}
+
+function getSessionHistory(sessionId) {
+  const history = historyCache || [];
+  return history.filter(msg => msg.sessionId === sessionId);
+}
+
 // 生成 session token
 function generateSessionToken() {
   return crypto.randomBytes(32).toString('hex');
@@ -1948,6 +1990,12 @@ async function handleHistory(req, res) {
         return sendJson(res, 200, { ok: true, duplicate: true });
       }
       
+      // 更新会话状态并获取 sessionId
+      const sessionId = updateChatSession(msg);
+      if (sessionId) {
+        msg.sessionId = sessionId;
+      }
+      
       history.push(msg);
       await saveHistory(history);
       
@@ -2343,7 +2391,7 @@ if (urlPath === "/api/admin/clear-cache" && method === "POST") {
 
   // 静态文件和公开 API 路径
   const isStaticFile = /\.(html|js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/i.test(urlPath);
-  const isPublicApi = urlPath === '/api/login' || urlPath === '/api/check-auth' || urlPath === '/api/health' || urlPath === '/api/mail-tunnel' || urlPath === '/api/tunnel' || urlPath === '/api/agent-logs/stream' || urlPath.startsWith('/api/agent/') || urlPath === '/api/broadcast' || urlPath === '/api/file/path' || urlPath.startsWith('/api/trae/') || urlPath.startsWith('/api/muse/') || urlPath === '/api/system-metrics' || urlPath === '/api/agents' || urlPath === '/api/agents/status' || urlPath.startsWith('/api/ops/') || urlPath === '/history' || urlPath === '/api/model-stats' || urlPath.startsWith('/css/') || urlPath.startsWith('/assets/') || urlPath.startsWith('/images/');
+  const isPublicApi = urlPath === '/api/login' || urlPath === '/api/check-auth' || urlPath === '/api/health' || urlPath === '/api/mail-tunnel' || urlPath === '/api/tunnel' || urlPath === '/api/agent-logs/stream' || urlPath.startsWith('/api/agent/') || urlPath === '/api/broadcast' || urlPath === '/api/file/path' || urlPath.startsWith('/api/trae/') || urlPath.startsWith('/api/muse/') || urlPath === '/api/system-metrics' || urlPath === '/api/agents' || urlPath === '/api/agents/status' || urlPath.startsWith('/api/sessions') || urlPath.startsWith('/api/ops/') || urlPath === '/history' || urlPath === '/api/model-stats' || urlPath.startsWith('/css/') || urlPath.startsWith('/assets/') || urlPath.startsWith('/images/');
 
   // 本地访问或已登录用户允许访问
   if (!isLocal && !hasValidSession && !isPublicApi) {
@@ -2410,10 +2458,25 @@ if (urlPath === "/api/admin/clear-cache" && method === "POST") {
   }
   
   // 模型使用统计 API
-  if (urlPath === "/api/model-stats" && method === "GET") {
-    return handleModelStats(req, res);
-  }
-  // 管理 API：重启网关
+if (urlPath === "/api/model-stats" && method === "GET") {
+  return handleModelStats(req, res);
+}
+
+// 会话列表 API
+if (urlPath === "/api/sessions" && method === "GET") {
+  const sessions = getChatSessions();
+  return sendJson(res, 200, { sessions, count: sessions.length, timestamp: Date.now() });
+}
+
+// 会话历史 API
+if (urlPath.match(/^\/api\/sessions\/[^/]+\/history$/) && method === "GET") {
+  const pathParts = urlPath.split('/');
+  const sessionId = pathParts[3];
+  const history = getSessionHistory(sessionId);
+  return sendJson(res, 200, { sessionId, history, count: history.length, timestamp: Date.now() });
+}
+
+// 管理 API：重启网关
 if (urlPath === "/api/admin/restart-gateway" && method === "POST") {
   return handleRestartGateway(req, res);
 }

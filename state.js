@@ -42,7 +42,7 @@ const initialState = {
     agentActiveRuns: new Map(),
     agentPendingTimers: new Map(),
     agentLogs: new Map(),
-    agentActivity: new Map(),
+    agentActivity: new Map(),  // agentId -> { status, lastActivity }
     expandedAgents: new Set(),
     filterAgents: new Set(),
     lastSpeaker: null,
@@ -50,9 +50,7 @@ const initialState = {
     theme: 'dark',
     searchQuery: '',
     searchMatches: [],
-    currentMatchIndex: -1,
-    sessions: new Map(),
-    replyTo: null
+    currentMatchIndex: -1
 };
 
 class StateManager {
@@ -373,46 +371,6 @@ class StateManager {
 
     getAgentByName(name) {
         return this._state.agents.find(a => a.name === name);
-    }
-
-    addOrUpdateSession(sessionId, agentId, agentName) {
-        const sessions = this._state.sessions instanceof Map 
-            ? new Map(this._state.sessions) 
-            : new Map(Object.entries(this._state.sessions || {}));
-        const existing = sessions.get(sessionId);
-        sessions.set(sessionId, {
-            id: sessionId,
-            shortId: sessionId.slice(0, 8),
-            agentId,
-            agentName,
-            lastMessageTime: Date.now(),
-            messageCount: (existing?.messageCount || 0) + 1
-        });
-        this._state.sessions = sessions;
-        this._notifySubscribers({ sessions: this._state.sessions }, { sessions });
-    }
-
-    getSessions() {
-        const sessions = this._state.sessions instanceof Map 
-            ? this._state.sessions 
-            : new Map(Object.entries(this._state.sessions || {}));
-        return Array.from(sessions.values())
-            .sort((a, b) => b.lastMessageTime - a.lastMessageTime);
-    }
-
-    getSession(sessionId) {
-        const sessions = this._state.sessions instanceof Map 
-            ? this._state.sessions 
-            : new Map(Object.entries(this._state.sessions || {}));
-        return sessions.get(sessionId);
-    }
-
-    setReplyTo(message) {
-        this.setState({ replyTo: message });
-    }
-
-    clearReplyTo() {
-        this.setState({ replyTo: null });
     }
 
     reset() {

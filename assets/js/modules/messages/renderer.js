@@ -19,6 +19,7 @@ export function renderMessage(msg) {
     const msgClass = isUser ? 'user' : 'agent';
     const timestamp = msg.timestamp || Date.now();
     const msgId = msg.id || timestamp;
+    const sessionId = msg.sessionId || msg.runId;
 
     let contentHtml = '';
     if (msg.image) {
@@ -36,13 +37,14 @@ export function renderMessage(msg) {
     const avatarColor = isUser ? '#3b82f6' : (agent.color || '#00d4ff');
     const isBusy = !isUser && stateManager.getState('agentBusyMap')?.get(agent.agentId);
     
-    // 消息状态
     const status = msg.status || (isUser ? 'sent' : 'received');
     const statusIcon = getStatusIcon(status);
     const statusClass = getStatusClass(status);
 
+    const sessionTagHtml = sessionId ? renderSessionTag(sessionId) : '';
+
     return `
-        <div class="msg ${msgClass}" data-timestamp="${timestamp}" data-msg-id="${msgId}" ${msg.runId ? `data-run-id="${msg.runId}"` : ''}>
+        <div class="msg ${msgClass}" data-timestamp="${timestamp}" data-msg-id="${msgId}" ${msg.runId ? `data-run-id="${msg.runId}"` : ''} ${sessionId ? `data-session-id="${sessionId}"` : ''}>
             ${!isUser ? `
                 <div class="msg-avatar-wrap ${isBusy ? 'busy' : ''}">
                     <div class="msg-avatar msg-agent-avatar" data-agent-id="${agent.agentId || agent.name}" style="background-image: url('${avatarUrl}');" data-sender="${escapeHtml(msg.sender)}"></div>
@@ -55,6 +57,7 @@ export function renderMessage(msg) {
             <div class="msg-content-wrapper">
                 ${!isUser ? `<div class="msg-meta">
                     <span>${escapeHtml(msg.sender)}</span>
+                    ${sessionTagHtml}
                     ${(() => {
                         const modelId = msg.model || msg.modelInfo?.modelId;
                         return modelId ? `<span class="msg-model-tag" title="使用的大模型">${modelId}</span>` : '';
@@ -73,6 +76,11 @@ export function renderMessage(msg) {
             </div>
         </div>
     `;
+}
+
+function renderSessionTag(sessionId) {
+    const shortId = sessionId.slice(0, 8);
+    return `<span class="session-tag clickable" title="点击回复此会话" data-session-id="${sessionId}" onclick="window.dispatchEvent(new CustomEvent('session:reply', { detail: { sessionId: '${sessionId}' } }))">#sess-${shortId}</span>`;
 }
 
 function getStatusIcon(status) {
