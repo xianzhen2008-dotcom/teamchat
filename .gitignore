@@ -1,4 +1,47 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
+
+# Environment
 .env
+.env.local
+
+# Logs
 *.log
+team_chat*.log
+*.log.*
+
+# Runtime data files (generated at runtime, not for source control)
+team_chat_history.json
+team_chat_metrics.json
+team_chat_metrics_history.json
+team_chat_daily_stats.json
+team_chat_errors.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.bak
+*~
+tmp/
+temp/
+
+# Uploads (user generated data)
+uploads/
+
+# Backups
+backups/
+*_backup*
+
+# Config (may contain sensitive data)
+config/

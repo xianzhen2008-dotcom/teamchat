@@ -126,5 +126,5 @@ npm start
 
 ### 相关链接
 
-- [OpenClaw](https://github.com/openclawopenclaw/teamchat) - 底层 AI 助手框架
+- [OpenClaw](https://github.com/openclaw/teamchat) - 底层 AI 助手框架
 - [文档](https://docs.openclaw.ai)
