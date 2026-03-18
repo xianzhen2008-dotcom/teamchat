@@ -206,6 +206,11 @@
                 <input type="password" id="password" placeholder="请输入访问密码" autocomplete="current-password" required>
             </div>
             
+            <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                <input type="checkbox" id="trust-device" style="width: 18px; height: 18px; cursor: pointer;">
+                <label for="trust-device" style="cursor: pointer; font-size: 14px; color: #666;">信任此设备（30天内免密登录）</label>
+            </div>
+            
             <button type="submit" class="login-btn" id="login-btn">登录</button>
             
             <button type="button" class="send-password-btn" id="send-password-btn" onclick="sendPasswordToWechat()">📤 发送登录口令到企业微信</button>
@@ -221,6 +226,7 @@
         const passwordInput = document.getElementById('password');
         const loginBtn = document.getElementById('login-btn');
         const errorMsg = document.getElementById('error-msg');
+        const trustDeviceCheckbox = document.getElementById('trust-device');
         
         const SESSION_KEY = 'team_chat_session';
         
@@ -238,6 +244,8 @@
             hideError();
             
             const password = passwordInput.value.trim();
+            const trustDevice = trustDeviceCheckbox.checked;
+            
             if (!password) {
                 showError('请输入密码');
                 return;
@@ -250,15 +258,17 @@
                 const res = await fetch('/api/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password })
+                    body: JSON.stringify({ password, trustDevice })
                 });
                 
                 const data = await res.json();
                 
                 if (data.ok && data.session) {
                     localStorage.setItem(SESSION_KEY, data.session);
-                    document.cookie = `session=${data.session}; path=/; max-age=86400`;
-                    // 登录成功后跳转到新版界面（使用 replace 避免历史记录问题）
+                    document.cookie = `session=${data.session}; path=/; max-age=86400; SameSite=None; Secure`;
+                    if (data.trustedDevice) {
+                        console.log('此设备已添加到信任列表');
+                    }
                     window.location.replace('/?session=' + data.session);
                 } else {
                     showError(data.error || '登录失败');
@@ -280,6 +290,37 @@
             if (sessionChecked) return;
             sessionChecked = true;
             
+            // 先检查是否为信任设备
+            try {
+                const trustRes = await fetch('/api/trusted-device/check');
+                const trustData = await trustRes.json();
+                
+                if (trustData.trusted) {
+                    // 信任设备，自动登录
+                    loginBtn.disabled = true;
+                    loginBtn.textContent = '自动登录中...';
+                    
+                    const res = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ trustDevice: true })
+                    });
+                    
+                    const data = await res.json();
+                    if (data.ok && data.session) {
+                        localStorage.setItem(SESSION_KEY, data.session);
+                        document.cookie = `session=${data.session}; path=/; max-age=86400; SameSite=None; Secure`;
+                        window.location.replace('/?session=' + data.session);
+                        return;
+                    }
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = '登录';
+                }
+            } catch (e) {
+                console.log('Trust check failed:', e);
+            }
+            
+            // 检查现有 session
             const session = localStorage.getItem(SESSION_KEY);
             if (session) {
                 try {
@@ -288,8 +329,7 @@
                     });
                     const data = await res.json();
                     if (data.authenticated) {
-                        document.cookie = `session=${session}; path=/; max-age=86400`;
-                        // 跳转到新版界面（使用 replace 避免历史记录问题）
+                        document.cookie = `session=${session}; path=/; max-age=86400; SameSite=None; Secure`;
                         window.location.replace('/?session=' + session);
                     }
                 } catch (e) {

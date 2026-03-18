@@ -35,11 +35,8 @@ class FilterModule {
     }
 
     bindEvents() {
-        const toggleBtn = $('#filter-toggle');
-        if (toggleBtn) {
-            on(toggleBtn, 'click', this.toggle.bind(this));
-        }
-
+        // 注意：toggle 按钮事件在 main.js 中绑定，避免重复绑定
+        
         if (this.overlay) {
             on(this.overlay, 'click', this.hide.bind(this));
         }
@@ -91,6 +88,7 @@ class FilterModule {
     }
 
     toggle() {
+        console.log("FILTER_TOGGLE_CALLED_20260317");
         if (this.visible) {
             this.hide();
         } else {

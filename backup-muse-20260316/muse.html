@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Muse System - 记忆与任务管理</title>
+    <link rel="stylesheet" href="assets/css/themes/light.css">
+    <link rel="stylesheet" href="assets/css/base.css">
+    <link rel="stylesheet" href="assets/css/components.css">
+    <link rel="stylesheet" href="assets/css/layout.css">
+    <style>
+        :root {
+            --primary: #4A90D9;
+            --success: #4CAF50;
+            --warning: #FFC107;
+            --danger: #F44336;
+            --info: #2196F3;
+            --priority-high: #F44336;
+            --priority-medium: #FFC107;
+            --priority-low: #4CAF50;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f5f5f5;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        
+        .header .subtitle {
+            opacity: 0.9;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .tabs {
+            display: flex;
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 0 20px;
+        }
+        
+        .tab {
+            padding: 15px 25px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s;
+        }
+        
+        .tab:hover {
+            color: var(--primary);
+        }
+        
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+        
+        .content {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #357abd;
+        }
+        
+        .task-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            background: #fafafa;
+            transition: all 0.3s;
+        }
+        
+        .task-item:hover {
+            background: #f0f0f0;
+        }
+        
+        .task-priority {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 12px;
+        }
+        
+        .priority-high { background: var(--priority-high); }
+        .priority-medium { background: var(--priority-medium); }
+        .priority-low { background: var(--priority-low); }
+        
+        .task-content {
+            flex: 1;
+        }
+        
+        .task-title {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .task-meta {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
+        
+        .task-status {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-pending { background: #FFF3E0; color: #E65100; }
+        .status-in_progress { background: #E3F2FD; color: #1565C0; }
+        .status-completed { background: #E8F5E9; color: #2E7D32; }
+        
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .memory-item {
+            padding: 15px;
+            border-left: 3px solid var(--primary);
+            background: #fafafa;
+            margin-bottom: 10px;
+            border-radius: 0 6px 6px 0;
+        }
+        
+        .memory-content {
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .memory-meta {
+            font-size: 12px;
+            color: #999;
+            margin-top: 8px;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        .error {
+            background: #FFEBEE;
+            color: #C62828;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧠 Muse System</h1>
+        <div class="subtitle">记忆与任务管理系统</div>
+    </div>
+    
+    <div class="tabs">
+        <div class="tab active" data-tab="tasks">📋 任务</div>
+        <div class="tab" data-tab="memory">🧠 记忆</div>
+        <div class="tab" data-tab="stats">📊 统计</div>
+    </div>
+    
+    <div class="content">
+        <!-- 任务列表 -->
+        <div id="tasks" class="tab-content active">
+            <div class="search-box">
+                <input type="text" class="search-input" id="taskSearch" placeholder="搜索任务...">
+                <button class="btn btn-primary" onclick="loadTasks()">🔍 搜索</button>
+            </div>
+            <div id="tasksList"></div>
+        </div>
+        
+        <!-- 记忆列表 -->
+        <div id="memory" class="tab-content">
+            <div class="search-box">
+                <input type="text" class="search-input" id="memorySearch" placeholder="搜索记忆...">
+                <button class="btn btn-primary" onclick="loadMemory()">🔍 搜索</button>
+            </div>
+            <div id="memoryList"></div>
+        </div>
+        
+        <!-- 统计 -->
+        <div id="stats" class="tab-content">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalTasks">-</div>
+                    <div class="stat-label">总任务数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="pendingTasks">-</div>
+                    <div class="stat-label">待处理</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="completedTasks">-</div>
+                    <div class="stat-label">已完成</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalMemory">-</div>
+                    <div class="stat-label">记忆条目</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = '';
+        
+        // Tab 切换
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+                
+                if (tab.dataset.tab === 'tasks') loadTasks();
+                if (tab.dataset.tab === 'memory') loadMemory();
+                if (tab.dataset.tab === 'stats') loadStats();
+            });
+        });
+        
+        // 加载任务
+        async function loadTasks() {
+            const container = document.getElementById('tasksList');
+            container.innerHTML = '<div class="loading">加载中...</div>';
+            
+            try {
+                const res = await fetch('/api/muse/tasks');
+                const data = await res.json();
+                
+                if (!data.tasks || data.tasks.length === 0) {
+                    container.innerHTML = '<div class="empty-state">暂无任务</div>';
+                    return;
+                }
+                
+                container.innerHTML = data.tasks.map(task => `
+                    <div class="task-item">
+                        <div class="task-priority priority-${task.priority || 'low'}"></div>
+                        <div class="task-content">
+                            <div class="task-title">${task.title || '无标题'}</div>
+                            <div class="task-meta">${task.assignee || '未分配'} · ${task.createdAt ? new Date(task.createdAt).toLocaleDateString() : ''}</div>
+                        </div>
+                        <span class="task-status status-${task.status || 'pending'}">${getStatusText(task.status)}</span>
+                    </div>
+                `).join('');
+            } catch (e) {
+                container.innerHTML = `<div class="error">加载失败: ${e.message}</div>`;
+            }
+        }
+        
+        // 加载记忆
+        async function loadMemory() {
+            const container = document.getElementById('memoryList');
+            container.innerHTML = '<div class="loading">加载中...</div>';
+            
+            try {
+                const res = await fetch('/api/muse/memories');
+                const data = await res.json();
+                
+                if (!data.results || data.results.length === 0) {
+                    container.innerHTML = '<div class="empty-state">暂无记忆</div>';
+                    return;
+                }
+                
+                container.innerHTML = data.results.slice(0, 20).map(item => `
+                    <div class="memory-item">
+                        <div class="memory-content">${item.memory || item.content || ''}</div>
+                        <div class="memory-meta">${item.created_at ? new Date(item.created_at).toLocaleString() : ''} · ${item.user_id || ''}</div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                container.innerHTML = `<div class="error">加载失败: ${e.message}</div>`;
+            }
+        }
+        
+        // 加载统计
+        async function loadStats() {
+            try {
+                const [tasksRes, memoryRes] = await Promise.all([
+                    fetch('/api/muse/tasks'),
+                    fetch('/api/muse/memories')
+                ]);
+                
+                const tasks = await tasksRes.json();
+                const memory = await memoryRes.json();
+                
+                document.getElementById('totalTasks').textContent = tasks.tasks?.length || 0;
+                document.getElementById('pendingTasks').textContent = tasks.tasks?.filter(t => t.status === 'pending').length || 0;
+                document.getElementById('completedTasks').textContent = tasks.tasks?.filter(t => t.status === 'completed').length || 0;
+                document.getElementById('totalMemory').textContent = memory.results?.length || 0;
+            } catch (e) {
+                console.error('Stats load error:', e);
+            }
+        }
+        
+        function getStatusText(status) {
+            const map = {
+                'pending': '待处理',
+                'in_progress': '进行中',
+                'completed': '已完成',
+                'cancelled': '已取消'
+            };
+            return map[status] || status;
+        }
+        
+        // 初始化
+        loadTasks();
+    </script>
+</body>
+</html>

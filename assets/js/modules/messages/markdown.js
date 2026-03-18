@@ -27,6 +27,14 @@ function isLocalAccess() {
     return host === 'localhost' || host === '127.0.0.1' || host === '';
 }
 
+function formatFileSize(bytes) {
+    if (bytes === 0 || bytes === undefined || bytes === null) return '';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + sizes[i];
+}
+
 export function renderMarkdown(md) {
     const src = String(md ?? '');
     const blocks = src.split('```');
@@ -198,7 +206,9 @@ export function renderMessageBlocks(content) {
     return { thinking, tools, text };
 }
 
-export function renderFileCard({ label, token }) {
+export function renderFileCard({ label, token, size }) {
+    console.log("FILE_CARD_LAYOUT_V2", { label, token, size });
+    
     let decodedToken = '';
     try {
         decodedToken = decodeURIComponent(String(token || ''));
@@ -215,11 +225,10 @@ export function renderFileCard({ label, token }) {
     const fileUrl = `/uploads/${token}`;
     const isLocal = isLocalAccess();
 
-    // 本地访问：直接打开，远程访问：触发下载
     const href = isLocal ? fileUrl : `${fileUrl}?download=1`;
     const downloadAttr = isLocal ? '' : `download="${escapeHtml(safeLabel)}"`;
+    const fileSize = formatFileSize(size);
 
-    // 图片类型特殊处理：直接显示图片，无需文字
     const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext);
     if (isImage) {
         return `
@@ -229,13 +238,13 @@ export function renderFileCard({ label, token }) {
         `;
     }
 
-    // 普通文件：横向卡片，左侧文字信息，右侧图标
     return `
         <a href="${href}" ${downloadAttr} class="file-card-horizontal" data-ext="${ext}" ${isLocal ? 'target="_blank"' : ''}>
             <div class="file-card-info">
                 <div class="file-card-name">${escapeHtml(safeLabel)}</div>
                 <div class="file-card-meta">
                     <span class="file-card-ext">${ext.toUpperCase()}</span>
+                    ${fileSize ? `<span class="file-card-size">${fileSize}</span>` : ''}
                 </div>
             </div>
             <div class="file-card-icon-box">

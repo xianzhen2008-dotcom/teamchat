@@ -24,8 +24,8 @@ const {
 } = require("./email_sync_service.cjs");
 
 // 企微 Webhook 通知模块
-const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
-const WECOM_NOTIFY_ENABLED = process.env.WECOM_NOTIFY_ENABLED === 'true'; // 已禁用企微通知
+const WEBHOOK_URL = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=8603f9a7-daf6-467f-b8e3-beeedafcaf5e';
+const WECOM_NOTIFY_ENABLED = false; // 已禁用企微通知
 
 // ===== 基础路径定义 =====
 const BASE_DIR = __dirname;
@@ -999,6 +999,102 @@ function getLatestTunnelUrl() {
 }
 const SESSION_SECRET = crypto.randomBytes(32).toString('hex');
 const activeSessions = new Map(); // sessionId -> { createdAt, lastAccess }
+const sendPasswordRateLimit = new Map(); // IP -> [timestamp1, timestamp2, ...] 速率限制
+
+// ===== 信任设备管理 =====
+const TRUSTED_DEVICES_FILE = path.join(OPENCLAW_HOME, 'teamchat_trusted_devices.json');
+let trustedDevices = new Map(); // deviceFingerprint -> { createdAt, lastAccess, userAgent, ip }
+
+function loadTrustedDevices() {
+  try {
+    if (fs.existsSync(TRUSTED_DEVICES_FILE)) {
+      const data = JSON.parse(fs.readFileSync(TRUSTED_DEVICES_FILE, 'utf8'));
+      trustedDevices = new Map(Object.entries(data));
+      console.log(`[Trusted Devices] Loaded ${trustedDevices.size} trusted devices`);
+    }
+  } catch (e) {
+    console.error('[Trusted Devices] Load failed:', e.message);
+  }
+}
+
+function saveTrustedDevices() {
+  try {
+    const data = Object.fromEntries(trustedDevices);
+    fs.writeFileSync(TRUSTED_DEVICES_FILE, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.error('[Trusted Devices] Save failed:', e.message);
+  }
+}
+
+function generateDeviceFingerprint(req) {
+  const userAgent = req.headers['user-agent'] || '';
+  const acceptLanguage = req.headers['accept-language'] || '';
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+  const fingerprint = crypto.createHash('sha256')
+    .update(`${userAgent}|${acceptLanguage}|${ip}`)
+    .digest('hex')
+    .substring(0, 32);
+  return fingerprint;
+}
+
+function isTrustedDevice(req) {
+  const fingerprint = generateDeviceFingerprint(req);
+  const device = trustedDevices.get(fingerprint);
+  
+  if (!device) return false;
+  
+  // 信任设备有效期 30 天
+  const TRUSTED_DEVICE_TIMEOUT = 30 * 24 * 60 * 60 * 1000;
+  if (Date.now() - device.lastAccess > TRUSTED_DEVICE_TIMEOUT) {
+    trustedDevices.delete(fingerprint);
+    saveTrustedDevices();
+    return false;
+  }
+  
+  // 更新最后访问时间
+  device.lastAccess = Date.now();
+  saveTrustedDevices();
+  return true;
+}
+
+function addTrustedDevice(req) {
+  const fingerprint = generateDeviceFingerprint(req);
+  const userAgent = req.headers['user-agent'] || '';
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+  
+  trustedDevices.set(fingerprint, {
+    createdAt: Date.now(),
+    lastAccess: Date.now(),
+    userAgent: userAgent.substring(0, 200),
+    ip: ip
+  });
+  
+  saveTrustedDevices();
+  console.log(`[Trusted Devices] Added device: ${fingerprint.substring(0, 8)}...`);
+  return fingerprint;
+}
+
+function removeTrustedDevice(fingerprint) {
+  if (trustedDevices.has(fingerprint)) {
+    trustedDevices.delete(fingerprint);
+    saveTrustedDevices();
+    return true;
+  }
+  return false;
+}
+
+function getTrustedDevicesList() {
+  return Array.from(trustedDevices.entries()).map(([fingerprint, device]) => ({
+    fingerprint: fingerprint.substring(0, 8) + '...',
+    createdAt: device.createdAt,
+    lastAccess: device.lastAccess,
+    userAgent: device.userAgent?.substring(0, 50) || 'Unknown',
+    ip: device.ip
+  }));
+}
+
+// 启动时加载信任设备
+loadTrustedDevices();
 
 // ===== 会话管理 =====
 const chatSessions = new Map(); // sessionId -> { sessionId, agentId, agentName, lastMessage, lastMessageTime, messageCount, createdAt }
@@ -2381,17 +2477,21 @@ function serveFile(res, filePath, downloadName = null, forceDownload = false) {
   const mime = MIME_TYPES[ext] || "application/octet-stream";
   
   // 优化：根据文件类型设置缓存策略
-  const cacheableExts = ['.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.eot'];
+  const cacheableExts = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.eot'];
+  const shortCacheExts = ['.css', '.js']; // CSS/JS 短时间缓存，便于更新
   const isCacheable = cacheableExts.includes(ext);
+  const isShortCache = shortCacheExts.includes(ext);
   
   const headers = {
     "Content-Type": mime,
     "Access-Control-Allow-Origin": "*",
   };
   
-  // 缓存策略：静态资源缓存 1 天
+  // 缓存策略：图片字体缓存 1 天，CSS/JS 缓存 1 分钟（开发环境便于调试）
   if (isCacheable) {
     headers["Cache-Control"] = "public, max-age=86400"; // 1 天
+  } else if (isShortCache) {
+    headers["Cache-Control"] = "public, max-age=60"; // 1 分钟
   } else {
     headers["Cache-Control"] = "no-store";
   }
@@ -2444,20 +2544,46 @@ const server = http.createServer(async (req, res) => {
     for await (const chunk of req) body += chunk;
     try {
       const data = JSON.parse(body);
+      
+      // 检查是否为信任设备（免密登录）
+      if (data.trustDevice && isTrustedDevice(req)) {
+        const newSessionToken = generateSessionToken();
+        activeSessions.set(newSessionToken, {
+          createdAt: Date.now(),
+          lastAccess: Date.now(),
+          trustedDevice: true
+        });
+        console.log(`[LOGIN] Trusted device auto-login from ${remoteAddr}`);
+        return sendJson(res, 200, { 
+          ok: true, 
+          session: newSessionToken,
+          trustedDevice: true,
+          message: "信任设备自动登录"
+        });
+      }
+      
+      // 密码登录
       if (data.password === LOGIN_PASSWORD) {
         const newSessionToken = generateSessionToken();
         activeSessions.set(newSessionToken, {
           createdAt: Date.now(),
           lastAccess: Date.now()
         });
+        
+        // 如果用户选择信任此设备，添加到信任列表
+        if (data.trustDevice) {
+          addTrustedDevice(req);
+        }
+        
         console.log(`[LOGIN] Successful login from ${remoteAddr}`);
         return sendJson(res, 200, { 
           ok: true, 
           session: newSessionToken,
+          trustedDevice: !!data.trustDevice,
           message: "登录成功"
         });
       } else {
-        console.log(`[LOGIN] Failed login from ${remoteAddr}, expected: ${LOGIN_PASSWORD}, got: ${data.password}`);
+        console.log(`[LOGIN] Failed login from ${remoteAddr}`);
       }
     } catch (e) {
       console.error("[LOGIN] Parse error:", e.message);
@@ -2465,23 +2591,81 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 401, { error: "密码错误" });
   }
   
-  // 更新密码 API
+  // 检查设备信任状态 API
+  if (urlPath === "/api/trusted-device/check" && method === "GET") {
+    const isTrusted = isTrustedDevice(req);
+    return sendJson(res, 200, { 
+      trusted: isTrusted,
+      fingerprint: generateDeviceFingerprint(req).substring(0, 8) + '...'
+    });
+  }
+  
+  // 获取信任设备列表 API - 仅限本地访问
+  if (urlPath === "/api/trusted-devices" && method === "GET") {
+    if (!isLocal) {
+      return sendJson(res, 403, { error: "禁止远程访问" });
+    }
+    return sendJson(res, 200, { devices: getTrustedDevicesList() });
+  }
+  
+  // 移除信任设备 API - 仅限本地访问
+  if (urlPath === "/api/trusted-device/remove" && method === "POST") {
+    if (!isLocal) {
+      return sendJson(res, 403, { error: "禁止远程访问" });
+    }
+    let body = "";
+    for await (const chunk of req) body += chunk;
+    try {
+      const data = JSON.parse(body);
+      if (removeTrustedDevice(data.fingerprint)) {
+        return sendJson(res, 200, { ok: true, message: "设备已移除" });
+      }
+    } catch (e) {}
+    return sendJson(res, 400, { error: "移除失败" });
+  }
+  
+  // 更新密码 API - 仅限本地访问
   if (urlPath === "/api/password/update" && method === "POST") {
+    if (!isLocal) {
+      return sendJson(res, 403, { error: "禁止远程访问" });
+    }
     return handlePasswordUpdate(req, res);
   }
   
-  // 获取当前密码 API
+  // 获取当前密码 API - 仅限本地访问
   if (urlPath === "/api/password" && method === "GET") {
+    if (!isLocal) {
+      return sendJson(res, 403, { error: "禁止远程访问" });
+    }
     return sendJson(res, 200, { password: LOGIN_PASSWORD });
   }
   
-  // 获取 Gateway Token API（供前端动态获取）
+  // 获取 Gateway Token API - 仅限本地访问
   if (urlPath === "/api/gateway-token" && method === "GET") {
+    if (!isLocal) {
+      return sendJson(res, 403, { error: "禁止远程访问" });
+    }
     return sendJson(res, 200, { token: gatewayToken });
   }
   
-  // 发送密码到企微 API
+  // 发送密码到企微 API - 公开访问（密码发送到企微，不返回给前端）
+  // 速率限制：同一 IP 每分钟最多 3 次
   if (urlPath === "/api/password/send" && method === "POST") {
+    const clientIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
+    const now = Date.now();
+    const minuteAgo = now - 60000;
+    
+    // 获取该 IP 的请求记录
+    let requests = sendPasswordRateLimit.get(clientIp) || [];
+    requests = requests.filter(t => t > minuteAgo);
+    
+    if (requests.length >= 3) {
+      return sendJson(res, 429, { error: "请求过于频繁，请稍后再试" });
+    }
+    
+    requests.push(now);
+    sendPasswordRateLimit.set(clientIp, requests);
+    
     const currentTunnelUrl = getLatestTunnelUrl();
     const loginUrl = currentTunnelUrl ? `${currentTunnelUrl}/team_chat_login.html` : 'http://127.0.0.1:18788/team_chat_login.html';
     notifyWecom(`🔐 TeamChat 登录口令\n密码: ${LOGIN_PASSWORD}\n链接: ${loginUrl}`);
@@ -2489,23 +2673,35 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({ success: true, message: "密码已发送到企微" }));
     return;
   }
-// 管理 API：重启网关
+// 管理 API：重启网关 - 仅限本地访问
 if (urlPath === "/api/admin/restart-gateway" && method === "POST") {
+  if (!isLocal) {
+    return sendJson(res, 403, { error: "禁止远程访问" });
+  }
   return handleRestartGateway(req, res);
 }
 
-// 管理 API：重启 TeamChat  
+// 管理 API：重启 TeamChat - 仅限本地访问
 if (urlPath === "/api/admin/restart-teamchat" && method === "POST") {
+  if (!isLocal) {
+    return sendJson(res, 403, { error: "禁止远程访问" });
+  }
   return handleRestartTeamChat(req, res);
 }
 
-// 管理 API：重启 Tunnel
+// 管理 API：重启 Tunnel - 仅限本地访问
 if (urlPath === "/api/admin/restart-tunnel" && method === "POST") {
+  if (!isLocal) {
+    return sendJson(res, 403, { error: "禁止远程访问" });
+  }
   return handleRestartTunnel(req, res);
 }
 
-// 管理 API：清空缓存
+// 管理 API：清空缓存 - 仅限本地访问
 if (urlPath === "/api/admin/clear-cache" && method === "POST") {
+  if (!isLocal) {
+    return sendJson(res, 403, { error: "禁止远程访问" });
+  }
   return handleClearCache(req, res);
 }
 
@@ -2527,7 +2723,7 @@ if (urlPath === "/api/admin/clear-cache" && method === "POST") {
 
   // 静态文件和公开 API 路径
   const isStaticFile = /\.(html|js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/i.test(urlPath);
-  const isPublicApi = urlPath === '/api/login' || urlPath === '/api/check-auth' || urlPath === '/api/health' || urlPath === '/api/mail-tunnel' || urlPath === '/api/tunnel' || urlPath === '/api/agent-logs/stream' || urlPath.startsWith('/api/agent/') || urlPath === '/api/broadcast' || urlPath === '/api/file/path' || urlPath.startsWith('/api/trae/') || urlPath.startsWith('/api/muse/') || urlPath === '/api/system-metrics' || urlPath === '/api/agents' || urlPath === '/api/agents/status' || urlPath.startsWith('/api/sessions') || urlPath.startsWith('/api/ops/') || urlPath === '/history' || urlPath === '/api/model-stats' || urlPath === '/api/export-history' || urlPath.startsWith('/css/') || urlPath.startsWith('/assets/') || urlPath.startsWith('/images/');
+  const isPublicApi = urlPath === '/api/login' || urlPath === '/api/check-auth' || urlPath === '/api/health' || urlPath.startsWith('/css/') || urlPath.startsWith('/assets/') || urlPath.startsWith('/images/') || urlPath.startsWith('/uploads/');
 
   // 本地访问或已登录用户允许访问
   if (!isLocal && !hasValidSession && !isPublicApi) {
@@ -2556,6 +2752,25 @@ if (urlPath === "/api/admin/clear-cache" && method === "POST") {
 
   if (urlPath === "/history") {
     return handleHistory(req, res);
+  }
+
+  // 获取指定时间戳之后的消息
+  if (urlPath === "/api/messages/since" && method === "GET") {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const since = parseInt(url.searchParams.get('timestamp')) || 0;
+    
+    const allHistory = await loadHistory();
+    const messages = allHistory.filter(msg => msg.timestamp > since);
+    const latestTimestamp = messages.length > 0 
+      ? Math.max(...messages.map(m => m.timestamp)) 
+      : since;
+    
+    console.log(`[MESSAGES SINCE] Found ${messages.length} messages since ${since}`);
+    return sendJson(res, 200, { 
+      count: messages.length, 
+      messages,
+      latestTimestamp 
+    });
   }
 
   // Agent 状态 API
@@ -2924,7 +3139,12 @@ if (urlPath === "/api/admin/clear-cache" && method === "POST") {
     }
   }
   
-  // 健康检查 API
+  const APP_VERSION = '1.2.1';
+  
+  if (urlPath === "/api/version" && method === "GET") {
+    return sendJson(res, 200, { version: APP_VERSION, timestamp: Date.now() });
+  }
+  
   if (urlPath === "/api/health" && method === "GET") {
     const memory = MetricsCollector.getMemoryUsage();
     const processMem = MetricsCollector.getProcessMemory();
@@ -3502,12 +3722,14 @@ if (urlPath === "/api/admin/clear-cache" && method === "POST") {
                 
                 // 自动加载会话历史并注入到消息中
                 const injectHistory = (agentId, message, callback) => {
-                  const { exec } = require('child_process');
-                  const script = `/Users/wusiwei/.openclaw/.muse/inject-history.sh "${agentId}" "${message.replace(/"/g, '\\\\"')}"`;
+                  const { execFile } = require('child_process');
+                  const scriptPath = '/Users/wusiwei/.openclaw/.muse/inject-history.sh';
+                  const safeAgentId = String(agentId).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 50);
+                  const safeMessage = String(message).slice(0, 10000);
                   
-                  exec(script, { timeout: 3000 }, (error, stdout) => {
+                  execFile(scriptPath, [safeAgentId, safeMessage], { timeout: 3000 }, (error, stdout) => {
                     if (error || !stdout) {
-                      callback(message); // 失败则使用原消息
+                      callback(message);
                     } else {
                       callback(stdout.trim());
                     }
@@ -3714,12 +3936,15 @@ server.on("upgrade", (req, socket, head) => {
   const url = new URL(req.url || "/", `http://127.0.0.1:${PORT}`);
   const sessionToken = url.searchParams.get("session") || 
                        req.headers["cookie"]?.match(/session=([^;]+)/)?.[1];
+  // 同时检查 auth_token 作为 fallback（解决服务器重启后 session 丢失问题）
+  const authToken = url.searchParams.get("token") || req.headers["x-token"];
   const hasValidSession = verifySession(sessionToken);
+  const hasValidAuthToken = authToken && authToken === gatewayToken;
   
-  console.log(`[WS UPGRADE] Request from ${remoteAddr}: ${urlPath} (local: ${isLocal}, session: ${hasValidSession ? 'valid' : 'invalid'})`);
+  console.log(`[WS UPGRADE] Request from ${remoteAddr}: ${urlPath} (local: ${isLocal}, session: ${hasValidSession ? 'valid' : 'invalid'}, authToken: ${authToken ? 'provided' : 'none'})`);
   
-  // 本地访问或已登录用户允许 WebSocket 连接
-  if (!isLocal && !hasValidSession) {
+  // 本地访问、已登录用户或有效 auth_token 允许 WebSocket 连接
+  if (!isLocal && !hasValidSession && !hasValidAuthToken) {
     console.warn(`[WS UPGRADE] Unauthorized from ${remoteAddr}`);
     socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
     socket.destroy();

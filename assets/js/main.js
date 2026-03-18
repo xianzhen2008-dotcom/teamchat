@@ -8,6 +8,7 @@ import { App } from './core/app.js';
 
 import { websocketService } from './services/websocket.js';
 import { avatarService } from './services/avatar.js';
+import { apiService } from './services/api.js';
 
 import { sidebarModule } from './modules/sidebar/index.js';
 import { messagesModule } from './modules/messages/index.js';
@@ -216,7 +217,10 @@ async function initApp() {
     // 预加载所有 Agent 的头像（传入文件名数组）
     avatarService.preloadAll(agents.map(a => a.img));
 
-    const app = new App();
+    const app = new App({ authToken: AUTH_TOKEN });
+
+    // 设置 apiService 的 token
+    apiService.setAuthToken(AUTH_TOKEN);
 
     sidebarModule.init({
         container: document.getElementById('sidebar'),
@@ -242,11 +246,13 @@ async function initApp() {
         overlay: document.getElementById('filter-panel-overlay'),
         grid: document.getElementById('filter-agent-grid')
     });
+    console.log("EVENT_BOUND_FILTER_INIT", { panel: !!document.getElementById('filter-panel') });
 
     searchModule.init({
         container: document.getElementById('search-container'),
         input: document.getElementById('search-input')
     });
+    console.log("EVENT_BOUND_SEARCH_INIT", { container: !!document.getElementById('search-container') });
 
     statusDashboard.init();
     metricsDashboard.init();
@@ -261,6 +267,7 @@ async function initApp() {
                 const serverHistory = await res.json();
                 console.log(`[History] 从服务器加载 ${serverHistory.length} 条历史消息`);
                 stateManager.loadHistory(serverHistory);
+                console.log("HISTORY_RE_RENDERED_20260317", { count: serverHistory.length });
             } else {
                 console.error('[History] 加载失败:', res.status);
             }
@@ -274,28 +281,84 @@ async function initApp() {
     // 初始化主题
     themeModule.init();
     
-    // 初始化工作日志按钮
+    // 初始化工作日志按钮（桌面端和移动端）
     const statusToggle = document.getElementById('status-toggle');
+    const statusToggle2 = document.getElementById('status-toggle-2');
+    const handleStatusToggle = () => {
+        statusDashboard.show();
+        // 关闭下拉菜单
+        const dropdown = document.getElementById('header-dropdown');
+        if (dropdown) dropdown.classList.remove('show');
+    };
     if (statusToggle) {
-        statusToggle.addEventListener('click', () => {
-            statusDashboard.show();
-        });
+        statusToggle.addEventListener('click', handleStatusToggle);
     }
-    
-    // 初始化性能监控按钮
+    if (statusToggle2) {
+        statusToggle2.addEventListener('click', handleStatusToggle);
+    }
+
+    // 初始化性能监控按钮（桌面端和移动端）
     const metricsToggle = document.getElementById('metrics-toggle');
+    const metricsToggle2 = document.getElementById('metrics-toggle-2');
+    const handleMetricsToggle = () => {
+        metricsDashboard.show();
+        const dropdown = document.getElementById('header-dropdown');
+        if (dropdown) dropdown.classList.remove('show');
+    };
     if (metricsToggle) {
-        metricsToggle.addEventListener('click', () => {
-            metricsDashboard.show();
-        });
+        metricsToggle.addEventListener('click', handleMetricsToggle);
     }
-    
-    // 初始化邮件监控按钮
+    if (metricsToggle2) {
+        metricsToggle2.addEventListener('click', handleMetricsToggle);
+    }
+
+    // 初始化邮件监控按钮（桌面端和移动端）
     const emailMonitorToggle = document.getElementById('email-monitor-toggle');
+    const emailMonitorToggle2 = document.getElementById('email-monitor-toggle-2');
+    const handleEmailMonitorToggle = () => {
+        emailMonitorDashboard.toggle();
+        const dropdown = document.getElementById('header-dropdown');
+        if (dropdown) dropdown.classList.remove('show');
+    };
     if (emailMonitorToggle) {
-        emailMonitorToggle.addEventListener('click', () => {
-            emailMonitorDashboard.toggle();
-        });
+        emailMonitorToggle.addEventListener('click', handleEmailMonitorToggle);
+    }
+    if (emailMonitorToggle2) {
+        emailMonitorToggle2.addEventListener('click', handleEmailMonitorToggle);
+    }
+
+    // 初始化搜索按钮（桌面端和移动端）
+    const searchToggle = document.getElementById('search-toggle');
+    const searchToggle2 = document.getElementById('search-toggle-2');
+    console.log("EVENT_BOUND_SEARCH_BUTTONS", { searchToggle: !!searchToggle, searchToggle2: !!searchToggle2 });
+    const handleSearchToggle = () => {
+        console.log("SEARCH_TOGGLE_CLICKED_20260317");
+        searchModule.toggle();
+        const dropdown = document.getElementById('header-dropdown');
+        if (dropdown) dropdown.classList.remove('show');
+    };
+    if (searchToggle) {
+        searchToggle.addEventListener('click', handleSearchToggle);
+    }
+    if (searchToggle2) {
+        searchToggle2.addEventListener('click', handleSearchToggle);
+    }
+
+    // 初始化筛选按钮（桌面端和移动端）
+    const filterToggle = document.getElementById('filter-toggle');
+    const filterToggle2 = document.getElementById('filter-toggle-2');
+    console.log("EVENT_BOUND_FILTER_BUTTONS", { filterToggle: !!filterToggle, filterToggle2: !!filterToggle2 });
+    const handleFilterToggle = () => {
+        console.log("FILTER_TOGGLE_CLICKED_20260317");
+        filterModule.toggle();
+        const dropdown = document.getElementById('header-dropdown');
+        if (dropdown) dropdown.classList.remove('show');
+    };
+    if (filterToggle) {
+        filterToggle.addEventListener('click', handleFilterToggle);
+    }
+    if (filterToggle2) {
+        filterToggle2.addEventListener('click', handleFilterToggle);
     }
     
     // 初始化锁屏按钮
@@ -548,24 +611,50 @@ async function initApp() {
     console.log('🚀 TeamChat initialized');
     
     // 添加全局同步函数供 metrics dashboard 使用
-    window.syncMessagesWithServer = async function(days = 7) {
+    window.syncMessagesWithServer = async function(forceFullSync = false) {
         const startTime = Date.now();
         try {
             // 获取本地消息
             const localMessages = stateManager.getState('messages') || [];
             const localCount = localMessages.length;
             
-            // 从服务器获取消息（支持可配置天数）
             const apiHost = window.location.port === '5173' ? 'http://localhost:18788' : window.location.origin;
-            const response = await fetch(`${apiHost}/history?days=${days}`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
-            });
+            const sessionToken = localStorage.getItem('team_chat_session') || '';
             
-            if (!response.ok) throw new Error('Failed to fetch history');
+            let serverHistory;
+            let serverCount;
             
-            const serverHistory = await response.json();
-            const serverCount = serverHistory.length;
+            if (forceFullSync) {
+                // 完整同步：获取最近 30 天的消息
+                let url = `${apiHost}/history?days=30`;
+                if (sessionToken) url += `&session=${sessionToken}`;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) throw new Error('Failed to fetch history');
+                
+                serverHistory = await response.json();
+                serverCount = serverHistory.length;
+            } else {
+                // 增量同步：只获取新消息
+                const lastTimestamp = parseInt(localStorage.getItem('lastMessageTimestamp')) || 0;
+                let url = `${apiHost}/api/messages/since?timestamp=${lastTimestamp}`;
+                if (sessionToken) url += `&session=${sessionToken}`;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) throw new Error('Failed to fetch new messages');
+                
+                const data = await response.json();
+                serverHistory = [...localMessages, ...(data.messages || [])];
+                serverCount = serverHistory.length;
+            }
             
             // 计算差异
             const diff = Math.abs(serverCount - localCount);
@@ -578,6 +667,8 @@ async function initApp() {
                 window.metricsDashboard.syncStatus.diff = diff;
                 window.metricsDashboard.syncStatus.latency = latency;
                 window.metricsDashboard.syncStatus.lastSyncTime = Date.now();
+                window.metricsDashboard.syncStatus.syncInProgress = false;
+                window.metricsDashboard.syncStatus.error = null;
                 window.metricsDashboard.updateSyncStatus();
             }
             
@@ -587,17 +678,22 @@ async function initApp() {
                 if (window.messagesModule && window.messagesModule.render) {
                     window.messagesModule.render();
                 }
+                
+                // 更新最后消息时间戳
+                const latestTimestamp = Math.max(...serverHistory.map(m => m.timestamp || 0));
+                localStorage.setItem('lastMessageTimestamp', latestTimestamp.toString());
             }
             
-            console.log(`[Sync] Sync completed: server=${serverCount}, local=${localCount}, diff=${diff}, days=${days}`);
+            console.log(`[Sync] Sync completed: server=${serverCount}, local=${localCount}, diff=${diff}`);
             eventBus.emit('toast:show', { 
-                message: `已同步 ${serverCount} 条消息（近 ${days} 天）`, 
+                message: `已同步 ${serverCount} 条消息`, 
                 type: 'success' 
             });
         } catch (e) {
             console.error('[Sync] Sync failed:', e);
             if (window.metricsDashboard) {
                 window.metricsDashboard.syncStatus.error = e.message;
+                window.metricsDashboard.syncStatus.syncInProgress = false;
                 window.metricsDashboard.updateSyncStatus();
             }
             eventBus.emit('toast:show', { 

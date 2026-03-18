@@ -1,0 +1,175 @@
+[data-theme='light'] {
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F5F5F5;
+  --bg-tertiary: #EBEBEB;
+  --bg-elevated: #FFFFFF;
+  --bg-overlay: rgba(0, 0, 0, 0.4);
+  --bg-glass: rgba(255, 255, 255, 0.8);
+  --bg-glass-light: rgba(245, 245, 245, 0.6);
+
+  --text-primary: #1A1A1A;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+  --text-disabled: #CCCCCC;
+  --text-inverse: #FFFFFF;
+
+  --accent-primary: #0066CC;
+  --accent-primary-hover: #0052A3;
+  --accent-primary-active: #003D7A;
+  --accent-secondary: #00A8CC;
+  --accent-secondary-hover: #008FB3;
+  --accent-secondary-active: #007599;
+  --accent-success: #00A843;
+  --accent-success-hover: #008F38;
+  --accent-success-active: #00752D;
+  --accent-warning: #E69500;
+  --accent-warning-hover: #CC8500;
+  --accent-warning-active: #B37500;
+  --accent-danger: #E63500;
+  --accent-danger-hover: #CC2F00;
+  --accent-danger-active: #B32900;
+  --accent-info: #00A3B8;
+  --accent-info-hover: #008A9C;
+  --accent-info-active: #007180;
+
+  --border-primary: rgba(0, 0, 0, 0.1);
+  --border-secondary: rgba(0, 0, 0, 0.05);
+  --border-accent: rgba(0, 102, 204, 0.5);
+  --border-focus: rgba(0, 102, 204, 0.8);
+  --border-error: rgba(230, 53, 0, 0.5);
+  --border-success: rgba(0, 168, 67, 0.5);
+
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.12);
+  --shadow-xl: 0 16px 32px rgba(0, 0, 0, 0.14);
+  --shadow-2xl: 0 24px 48px rgba(0, 0, 0, 0.16);
+  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.08);
+  --shadow-glow: 0 0 20px rgba(0, 102, 204, 0.2);
+  --shadow-glow-sm: 0 0 10px rgba(0, 102, 204, 0.15);
+  --shadow-glow-lg: 0 0 40px rgba(0, 102, 204, 0.25);
+  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.1);
+
+  --priority-critical: #E63500;
+  --priority-high: #E66200;
+  --priority-medium: #E69500;
+  --priority-low: #00A843;
+
+  --status-pending: #E69500;
+  --status-active: #0066CC;
+  --status-completed: #00A843;
+  --status-cancelled: #999999;
+  --status-paused: #8E24AA;
+  --status-error: #E63500;
+}
+
+[data-theme='light'] .card-glass {
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .header {
+  background-color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .sidebar {
+  background-color: rgba(245, 245, 245, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .modal {
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+[data-theme='light'] .dropdown-menu {
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme='light'] .toast {
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme='light'] input,
+[data-theme='light'] textarea,
+[data-theme='light'] select {
+  background-color: #FFFFFF;
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+[data-theme='light'] input:hover,
+[data-theme='light'] textarea:hover,
+[data-theme='light'] select:hover {
+  border-color: rgba(0, 102, 204, 0.4);
+}
+
+[data-theme='light'] input:focus,
+[data-theme='light'] textarea:focus,
+[data-theme='light'] select:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+[data-theme='light'] ::selection {
+  background-color: rgba(0, 102, 204, 0.3);
+}
+
+[data-theme='light'] ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme='light'] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme='light'] .btn-primary {
+  color: var(--text-inverse);
+}
+
+[data-theme='light'] .btn-danger {
+  color: var(--text-inverse);
+}
+
+[data-theme='light'] .btn-success {
+  color: var(--text-inverse);
+}
+
+[data-theme='light'] .badge-primary {
+  color: var(--text-inverse);
+}
+
+[data-theme='light'] .badge-success {
+  color: var(--text-inverse);
+}
+
+[data-theme='light'] .badge-danger {
+  color: var(--text-inverse);
+}
+
+[data-theme='light'] .skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-tertiary) 25%,
+    var(--bg-secondary) 50%,
+    var(--bg-tertiary) 75%
+  );
+  background-size: 200% 100%;
+}

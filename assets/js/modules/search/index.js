@@ -44,11 +44,8 @@ class SearchModule {
     }
 
     bindEvents() {
-        const toggleBtn = document.getElementById('search-toggle');
-        if (toggleBtn) {
-            on(toggleBtn, 'click', this.toggle.bind(this));
-        }
-
+        // 注意：toggle 按钮事件在 main.js 中绑定，避免重复绑定
+        
         if (this.input) {
             on(this.input, 'input', debounce(this.handleSearch.bind(this), 300));
             on(this.input, 'keydown', this.handleKeydown.bind(this));
@@ -181,6 +178,7 @@ class SearchModule {
     }
 
     toggle() {
+        console.log("SEARCH_TOGGLE_CALLED_20260317");
         if (this.visible) {
             this.close();
         } else {
