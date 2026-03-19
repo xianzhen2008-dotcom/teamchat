@@ -14,7 +14,9 @@ const path = require('path');
 
 // 修正路径：邮件存档在 .openclaw 根目录
 const BASE_DIR = path.join(__dirname, '..');
-const WECOM_MAIL_DIR = '/Users/wusiwei/.openclaw/skills/wecom-mail';
+const os = require('os');
+const OPENCLAW_HOME = process.env.OPENCLAW_HOME || path.join(os.homedir(), '.openclaw');
+const WECOM_MAIL_DIR = path.join(OPENCLAW_HOME, 'wecom-mail');
 const EMAIL_SYNC_SCRIPT = path.join(WECOM_MAIL_DIR, 'comprehensive_sync.js');
 const EMAIL_ARCHIVE_DIR = path.join(BASE_DIR, '../../email_archive');
 const CLEANUP_SCRIPT = path.join(WECOM_MAIL_DIR, 'cleanup_old_emails.js');

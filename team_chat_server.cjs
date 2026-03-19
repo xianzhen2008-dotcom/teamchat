@@ -9,6 +9,7 @@ const axios = require("axios");
 const https = require("https");
 const url = require("url");
 const readline = require("readline");
+require("dotenv").config();
 
 const { handleMuseApi } = require("./muse-api.cjs");
 const { 
@@ -764,9 +765,9 @@ async function sendWecomNotification(content) {
   });
 }
 
-const PORT = 18788;
-const GATEWAY_PORT = 18789;
-const OPENCLAW_HOME = "/Users/wusiwei/.openclaw";
+const PORT = Number(process.env.PORT || 18788);
+const GATEWAY_PORT = Number(process.env.GATEWAY_PORT || 18789);
+const OPENCLAW_HOME = process.env.OPENCLAW_HOME || path.join(os.homedir(), ".openclaw");
 const CONFIG_PATH = path.join(OPENCLAW_HOME, "openclaw.json");
 const AGENTS_DIR = path.join(OPENCLAW_HOME, "agents");
 
@@ -788,7 +789,11 @@ let LOGIN_PASSWORD = Math.floor(100000 + Math.random() * 900000).toString();
 // 通知企微的函数
 async function notifyWecom(message) {
     try {
-        const webhookUrl = process.env.WECOM_WEBHOOK_URL || 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=8603f9a7-daf6-467f-b8e3-beeedafcaf5e';
+        const webhookUrl = process.env.WECOM_WEBHOOK_URL || '';
+        if (!webhookUrl) {
+            console.log('[企微通知] WECOM_WEBHOOK_URL 未配置，跳过发送');
+            return;
+        }
         const response = await axios.post(webhookUrl, {
             msgtype: 'text',
             text: { content: message }
@@ -810,7 +815,7 @@ console.log(`[登录密码] 初始密码: ${LOGIN_PASSWORD}`);
 
 // 读取 TeamChat 隧道 URL
 let TEAMCHAT_TUNNEL_URL = '';
-const TEAMCHAT_TUNNEL_FILE = '/Users/wusiwei/.openclaw/team_chat_tunnel.url';
+const TEAMCHAT_TUNNEL_FILE = path.join(OPENCLAW_HOME, 'team_chat_tunnel.url');
 
 function readTunnelUrl() {
     try {
@@ -1479,7 +1484,7 @@ let agentStatusCache = { status: {}, lastUpdate: 0 };
 
 // Agent 日志列表
 function handleAgentLogsList(req, res) {
-  const logsDir = '/Users/wusiwei/.openclaw/agents';
+  const logsDir = AGENTS_DIR;
   const result = [];
   try {
     const agents = fs.readdirSync(logsDir);
@@ -1503,7 +1508,7 @@ function handleAgentLogs(req, res) {
   const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathParts = parsedUrl.pathname.split('/');
   const agentId = pathParts[3];
-  const logsDir = `/Users/wusiwei/.openclaw/agents/${agentId}/sessions`;
+  const logsDir = path.join(AGENTS_DIR, agentId, 'sessions');
   try {
     if (!fs.existsSync(logsDir)) {
       res.writeHead(404);
@@ -1617,7 +1622,7 @@ function handleAgentWorkLog(req, res) {
   const pathParts = parsedUrl.pathname.split('/');
   const agentId = pathParts[3];
   const lines = parseInt(parsedUrl.searchParams.get('lines')) || 50;
-  const logsDir = `/Users/wusiwei/.openclaw/agents/${agentId}/sessions`;
+  const logsDir = path.join(AGENTS_DIR, agentId, 'sessions');
   
   try {
     if (!fs.existsSync(logsDir)) {
@@ -3321,7 +3326,7 @@ if (urlPath === "/api/admin/clear-cache" && method === "POST") {
       // 清理锁文件
       try {
         const fs = require('fs');
-        const lockFile = '/Users/wusiwei/.openclaw/.gateway.lock';
+        const lockFile = path.join(OPENCLAW_HOME, '.gateway.lock');
         if (fs.existsSync(lockFile)) {
           fs.unlinkSync(lockFile);
         }
@@ -3722,10 +3727,8 @@ if (urlPath === "/api/admin/clear-cache" && method === "POST") {
                 
                 // 自动加载会话历史并注入到消息中
                 const injectHistory = (agentId, message, callback) => {
-                  const { execFile } = require('child_process');
-                  const scriptPath = '/Users/wusiwei/.openclaw/.muse/inject-history.sh';
-                  const safeAgentId = String(agentId).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 50);
-                  const safeMessage = String(message).slice(0, 10000);
+                  const { exec } = require('child_process');
+                  const script = `${path.join(OPENCLAW_HOME, ".muse", "inject-history.sh")} "${agentId}" "${message.replace(/"/g, '\\"')}"`;
                   
                   execFile(scriptPath, [safeAgentId, safeMessage], { timeout: 3000 }, (error, stdout) => {
                     if (error || !stdout) {

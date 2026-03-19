@@ -8,7 +8,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "node team_chat_server.cjs"
+    "start": "node team_chat_server.cjs",
+    "doctor": "node scripts/doctor.cjs",
+    "bootstrap": "bash scripts/bootstrap.sh",
+    "smoke": "node scripts/smoke.cjs",
+    "install:oneclick": "bash scripts/install_teamchat.sh"
   },
   "keywords": [
     "ai",
@@ -30,9 +34,12 @@
     "url": "https://github.com/openclaw/teamchat/issues"
   },
   "dependencies": {
+    "axios": "^1.13.2",
     "better-sqlite3": "^12.6.2",
     "dotenv": "^17.3.1",
-    "imap": "^0.8.19"
+    "http-proxy": "^1.18.1",
+    "imap": "^0.8.19",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "vite": "^5.0.0"
