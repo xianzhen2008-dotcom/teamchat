@@ -3,6 +3,8 @@
  * 渲染用户和 Agent 消息
  */
 
+console.log("RENDERER_LOADED");
+
 import { renderMarkdown, renderThinkingBlock, renderToolCard } from './markdown.js';
 import { escapeHtml } from '../../utils/sanitize.js';
 import { formatTimeWithDate } from '../../utils/format.js';
@@ -10,6 +12,7 @@ import { avatarService } from '../../services/avatar.js';
 import { stateManager } from '../../core/state.js';
 
 export function renderMessage(msg) {
+    console.log("RENDER_MESSAGE_CALLED", msg);
     const agents = stateManager.getState('agents') || [];
     const agent = agents.find(a => a.name === msg.sender) || { img: '小龙虾.png', color: '#00d4ff' };
     const avatarUrl = avatarService.getUrl(agent.img);
@@ -75,11 +78,11 @@ export function renderMessage(msg) {
             `}
             <div class="msg-content-wrapper">
                 ${!isUser ? `<div class="msg-meta">
-                    <span>${escapeHtml(msg.sender)}</span>
+                    <span class="msg-sender">${escapeHtml(msg.sender)}</span>
                     ${sessionTagHtml}
                     ${(() => {
                         const modelId = msg.model || msg.modelInfo?.modelId;
-                        return modelId ? `<span class="msg-model-tag" title="使用的大模型">${modelId}</span>` : '';
+                        return modelId ? `<span class="msg-model-tag" title="模型: ${modelId}">🤖 ${modelId}</span>` : '';
                     })()}
                 </div>` : ''}
                 ${thinkingHtml}
@@ -89,9 +92,9 @@ export function renderMessage(msg) {
                     <div class="msg-time">${formatTimeWithDate(new Date(timestamp))}</div>
                     <div class="msg-status ${statusClass}" data-status="${status}">${statusIcon} <span class="status-text">${getStatusText(status)}</span></div>
                     <div class="msg-actions">
-                        <button class="msg-action-btn" data-action="reply" title="引用">↩️</button>
+                        <button class="msg-action-btn" data-action="reply" title="引用">💬</button>
                         <button class="msg-action-btn" data-action="copy" title="复制">📋</button>
-                        ${isUser ? `<button class="msg-action-btn" data-action="recall" title="撤回">↩️</button>` : ''}
+                        ${isUser ? `<button class="msg-action-btn" data-action="recall" title="撤回">🗑️</button>` : ''}
                     </div>
                 </div>
             </div>
@@ -100,8 +103,12 @@ export function renderMessage(msg) {
 }
 
 function renderSessionTag(sessionId) {
-    const shortId = sessionId.slice(0, 8);
-    return `<span class="session-tag clickable" title="点击回复此会话" data-session-id="${sessionId}" onclick="window.dispatchEvent(new CustomEvent('session:reply', { detail: { sessionId: '${sessionId}' } }))">#sess-${shortId}</span>`;
+    if (!sessionId || !sessionId.startsWith('session-')) return '';
+    const agentId = sessionId.replace('session-', '');
+    const agents = stateManager.getState('agents') || [];
+    const agent = agents.find(a => a.agentId === agentId);
+    const displayName = agent ? agent.name : agentId;
+    return `<span class="session-tag" title="会话所属: ${displayName}">💬 ${displayName}</span>`;
 }
 
 function getStatusIcon(status) {
@@ -199,6 +206,8 @@ function formatFileSize(bytes) {
 }
 
 function renderFileCard({ label, token, size }) {
+    console.log("RENDER_FILE_CARD_CALLED", { label, token, size });
+    
     const ext = label.split('.').pop().toLowerCase();
     const icon = getFileIcon(ext);
     const fileUrl = `/uploads/${token}`;
@@ -221,10 +230,11 @@ function renderFileCard({ label, token, size }) {
     }
 
     // 普通文件：横向卡片，左侧文字信息，右侧图标
+    // 🔴 UI 变化标记：添加了 "📄" 前缀，如果看到说明新代码生效
     return `
         <a href="${href}" ${downloadAttr} class="file-card-horizontal" data-ext="${ext}" ${isLocal ? 'target="_blank"' : ''}>
             <div class="file-card-info">
-                <div class="file-card-name">${escapeHtml(label)}</div>
+                <div class="file-card-name">📄 ${escapeHtml(label)}</div>
                 <div class="file-card-meta">
                     <span class="file-card-size">${fileSize}</span>
                     <span class="file-card-ext">${ext.toUpperCase()}</span>

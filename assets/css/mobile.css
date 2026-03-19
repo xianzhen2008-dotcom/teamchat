@@ -3,6 +3,15 @@
  * 移动端特定样式，包含所有 @media (max-width: 768px) 的样式
  */
 
+/* 桌面端和移动端显示控制 */
+.desktop-only {
+    display: inline-block !important;
+}
+
+.mobile-only {
+    display: none !important;
+}
+
 @media (max-width: 768px) {
     :root {
         --sidebar-width: 85vw;
@@ -20,6 +29,15 @@
         --msg-spacing: 12px;
         --msg-font-size: 16px;
         --meta-font-size: 11px;
+    }
+
+    /* 移动端显示控制 */
+    .desktop-only {
+        display: none !important;
+    }
+
+    .mobile-only {
+        display: flex !important;
     }
 
     * {

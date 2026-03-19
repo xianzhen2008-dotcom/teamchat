@@ -7,13 +7,13 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>TeamChat - AI Agent 协作平台</title>
     
-    <link rel="stylesheet" href="/css/variables.css?v=74">
-    <link rel="stylesheet" href="/css/base.css?v=74">
-    <link rel="stylesheet" href="/css/components.css?v=74">
-    <link rel="stylesheet" href="/css/layout.css?v=99">
-    <link rel="stylesheet" href="/css/mobile.css?v=74">
-    <link rel="stylesheet" href="/css/themes/dark.css?v=74" id="theme-dark">
-    <link rel="stylesheet" href="/css/themes/light.css?v=74" id="theme-light" disabled>
+    <link rel="stylesheet" href="/css/variables.css?v=126">
+    <link rel="stylesheet" href="/css/base.css?v=126">
+    <link rel="stylesheet" href="/css/components.css?v=126">
+    <link rel="stylesheet" href="/css/layout.css?v=126">
+    <link rel="stylesheet" href="/css/mobile.css?v=126">
+    <link rel="stylesheet" href="/css/themes/dark.css?v=126" id="theme-dark">
+    <link rel="stylesheet" href="/css/themes/light.css?v=126" id="theme-light" disabled>
 
     <!-- 预加载压缩后的头像，加速首屏渲染 -->
     <link rel="preload" href="/images/agent-default.png" as="image">
@@ -38,15 +38,37 @@
                 <div class="header-title">
                     <span id="current-agent-name">TeamChat</span>
                     <span class="connection-status" id="connection-status"></span>
+                    <span class="version-info" id="version-info">v1.2.0</span>
                 </div>
                 <div class="header-actions">
-                    <button class="header-btn" id="search-toggle" title="搜索">🔍</button>
-                    <button class="header-btn" id="filter-toggle" title="筛选">🏷️</button>
-                    <button class="header-btn" id="status-toggle" title="工作日志">📋</button>
-                    <button class="header-btn" id="metrics-toggle" title="性能监控">📈</button>
-                    <button class="header-btn" id="email-monitor-toggle" title="邮件监控">📧</button>
+                    <button class="header-btn desktop-only" id="search-toggle" title="搜索">🔍</button>
+                    <button class="header-btn desktop-only" id="filter-toggle" title="筛选">🏷️</button>
+                    <button class="header-btn desktop-only" id="status-toggle" title="工作日志">📋</button>
+                    <button class="header-btn desktop-only" id="metrics-toggle" title="性能监控">📈</button>
+                    <button class="header-btn desktop-only" id="email-monitor-toggle" title="邮件监控">📧</button>
                     <button class="header-btn more-toggle" id="more-toggle" title="更多">⋯</button>
                     <div class="header-dropdown" id="header-dropdown">
+                        <button class="dropdown-item mobile-only" id="search-toggle-2">
+                            <span class="dropdown-icon">🔍</span>
+                            <span>搜索</span>
+                        </button>
+                        <button class="dropdown-item mobile-only" id="filter-toggle-2">
+                            <span class="dropdown-icon">🏷️</span>
+                            <span>筛选</span>
+                        </button>
+                        <button class="dropdown-item mobile-only" id="status-toggle-2">
+                            <span class="dropdown-icon">📋</span>
+                            <span>工作日志</span>
+                        </button>
+                        <button class="dropdown-item mobile-only" id="metrics-toggle-2">
+                            <span class="dropdown-icon">📈</span>
+                            <span>性能监控</span>
+                        </button>
+                        <button class="dropdown-item mobile-only" id="email-monitor-toggle-2">
+                            <span class="dropdown-icon">📧</span>
+                            <span>邮件监控</span>
+                        </button>
+                        <div class="dropdown-divider mobile-only"></div>
                         <button class="dropdown-item" id="scroll-lock-toggle-2">
                             <span class="dropdown-icon">🔓</span>
                             <span>锁定滚动</span>
@@ -105,6 +127,6 @@
         <div class="toast-container" id="toast-container"></div>
     </div>
 
-    <script type="module" src="/assets/js/main.js?v=106"></script>
+    <script type="module" src="/assets/js/main.js?v=126"></script>
 </body>
 </html>

@@ -20,14 +20,15 @@ const GATEWAY_URL = `${WS_PROTOCOL}//${GATEWAY_HOST}/v1/gateway`;
 const CLIENT_ID = 'cli';
 const AUTH_TOKEN = '6ed82a04d1ee1f774459f0a64d19a79afda1dc10d8d1c49a';
 
-const HEARTBEAT_INTERVAL = 10000;
-const HEARTBEAT_TIMEOUT = 30000;
-const MAX_MISSED_HEARTBEATS = 3;
-const RECONNECT_BASE_DELAY = 1000;
-const RECONNECT_MAX_DELAY = 30000;
+const HEARTBEAT_INTERVAL = 5000;
+const HEARTBEAT_TIMEOUT = 15000;
+const MAX_MISSED_HEARTBEATS = 2;
+const RECONNECT_BASE_DELAY = 500;
+const RECONNECT_MAX_DELAY = 5000;
+const MAX_RECONNECT_ATTEMPTS = 10;
 
 class App {
-    constructor() {
+    constructor(options = {}) {
         this.ws = null;
         this.connectReqId = null;
         this.syncTimer = null;
@@ -41,6 +42,9 @@ class App {
         this.runMessageEls = new Map();
         this.processedMessageIds = new Set();
         this.initialized = false;
+        this.lastMessageTimestamp = parseInt(localStorage.getItem('lastMessageTimestamp')) || 0;
+        this.authToken = options.authToken || AUTH_TOKEN;
+        this.syncInterval = 30000; // 每 30 秒同步一次
     }
 
     async init() {
@@ -60,6 +64,9 @@ class App {
         await this._loadHistory();
         
         this._connect();
+        
+        // 启动定期同步
+        this._startPeriodicSync();
         
         this.initialized = true;
         
@@ -125,13 +132,44 @@ class App {
     _handleVisibilityChange() {
         if (document.hidden) {
             console.log('[App] App went to background');
+            this._pauseHeartbeat();
         } else {
             console.log('[App] App came to foreground');
-            if (!state.getStateValue('isConnected') && !this.reconnectTimer) {
+            this._resumeHeartbeat();
+            if (!state.getStateValue('isConnected')) {
+                this._cancelReconnect();
                 this.reconnectAttempts = 0;
                 this._connect();
+            } else {
+                this._verifyConnection();
             }
         }
+    }
+
+    _pauseHeartbeat() {
+        if (this.pingTimer) {
+            clearInterval(this.pingTimer);
+            this.pingTimer = null;
+        }
+    }
+
+    _resumeHeartbeat() {
+        if (!this.pingTimer) {
+            this.pingTimer = setInterval(() => this._sendHeartbeat(), HEARTBEAT_INTERVAL);
+        }
+    }
+
+    _verifyConnection() {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            console.log('[App] Connection verify failed, reconnecting...');
+            state.setConnected(false);
+            this._cancelReconnect();
+            this.reconnectAttempts = 0;
+            this._connect();
+            return;
+        }
+        this.missedHeartbeats = 0;
+        this.ws.send(JSON.stringify({ type: 'ping' }));
     }
 
     _handleNetworkOnline() {
@@ -219,7 +257,7 @@ class App {
         try {
             const apiHost = window.location.port === '5173' ? 'http://localhost:18788' : window.location.origin;
             const sessionToken = localStorage.getItem('team_chat_session') || '';
-            let historyUrl = `${apiHost}/history?token=${AUTH_TOKEN}`;
+            let historyUrl = `${apiHost}/history?token=${this.authToken}`;
             if (sessionToken) {
                 historyUrl += `&session=${sessionToken}`;
             }
@@ -241,11 +279,15 @@ class App {
 
         // 获取session token用于远程访问验证
         const sessionToken = localStorage.getItem('team_chat_session') || '';
-        let wsUrl = `${GATEWAY_URL}?token=${AUTH_TOKEN}`;
+        let wsUrl = `${GATEWAY_URL}?token=${this.authToken}`;
         if (sessionToken) {
             wsUrl += `&session=${sessionToken}`;
         }
-        console.log('[App] Connecting to WS:', wsUrl.replace(/token=[^&]+/, 'token=***'));
+        
+        // 移动端调试信息
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        console.log(`[App] Connecting to WS (${isMobile ? 'Mobile' : 'Desktop'}):`, wsUrl.replace(/token=[^&]+/, 'token=***'));
+        console.log('[App] Browser info:', navigator.userAgent.substring(0, 100));
 
         if (this.ws) {
             this.ws.onopen = null;
@@ -269,7 +311,13 @@ class App {
         this.ws.onmessage = (event) => this._onWsMessage(event);
         this.ws.onclose = (e) => this._onWsClose(e);
         this.ws.onerror = (e) => {
-            console.error('[App] WS Error:', e);
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            console.error(`[App] WS Error (${isMobile ? 'Mobile' : 'Desktop'}):`, e);
+            console.error('[App] WS Error details:', {
+                type: e.type,
+                target: e.target?.url?.replace(/token=[^&]+/, 'token=***'),
+                readyState: e.target?.readyState
+            });
             emit('ws:error', e);
         };
         
@@ -297,19 +345,83 @@ class App {
 
         emit(EventTypes.UI_TOAST, { message: '正在握手...', type: 'info' });
         
-        // 直接发送 connect 请求（不带 nonce）
-        // 如果 Gateway 需要 challenge，会返回 connect.challenge 事件
-        this._sendConnectRequest();
+        // 不要立即发送 connect 请求，等待 Gateway 发送 connect.challenge 事件
+        // this._sendConnectRequest();
 
         if (this.pingTimer) clearInterval(this.pingTimer);
         this.pingTimer = setInterval(() => this._sendHeartbeat(), HEARTBEAT_INTERVAL);
 
         if (this.wasOffline) {
             this.wasOffline = false;
+            this._syncMissedMessages();
+        } else {
+            this._loadHistory();
         }
-
-        this._loadHistory();
         this.processedMessageIds.clear();
+    }
+
+    async _syncMissedMessages() {
+        console.log('[App] Syncing missed messages since', this.lastMessageTimestamp);
+        try {
+            const apiHost = window.location.port === '5173' ? 'http://localhost:18788' : window.location.origin;
+            const res = await fetch(`${apiHost}/api/messages/since?timestamp=${this.lastMessageTimestamp}`);
+            if (res.ok) {
+                const data = await res.json();
+                console.log(`[App] Synced ${data.count} missed messages`);
+                
+                if (data.messages && data.messages.length > 0) {
+                    for (const msg of data.messages) {
+                        if (!this.processedMessageIds.has(msg.timestamp)) {
+                            this.processedMessageIds.add(msg.timestamp);
+                            emit(EventTypes.MESSAGE_RECEIVED, {
+                                sender: msg.sender,
+                                text: msg.text,
+                                isUser: msg.sender === '我',
+                                timestamp: msg.timestamp,
+                                modelInfo: msg.modelInfo || null
+                            });
+                        }
+                    }
+                }
+                
+                if (data.latestTimestamp > this.lastMessageTimestamp) {
+                    this.lastMessageTimestamp = data.latestTimestamp;
+                    localStorage.setItem('lastMessageTimestamp', data.latestTimestamp.toString());
+                }
+                
+                emit(EventTypes.UI_TOAST, { message: `已同步 ${data.count} 条消息`, type: 'success' });
+            }
+        } catch (e) {
+            console.error('[App] Sync missed messages failed:', e);
+            this._loadHistory();
+        }
+    }
+
+    _startPeriodicSync() {
+        // 清除之前的定时器
+        if (this.syncTimer) {
+            clearInterval(this.syncTimer);
+        }
+        
+        // 每 30 秒同步一次
+        this.syncTimer = setInterval(() => {
+            this._syncMissedMessages();
+        }, this.syncInterval);
+        
+        console.log('[App] Started periodic sync every', this.syncInterval / 1000, 'seconds');
+    }
+
+    _stopPeriodicSync() {
+        if (this.syncTimer) {
+            clearInterval(this.syncTimer);
+            this.syncTimer = null;
+        }
+    }
+
+    // 手动同步
+    async manualSync() {
+        console.log('[App] Manual sync triggered');
+        await this._syncMissedMessages();
     }
 
     _onWsMessage(event) {
@@ -341,7 +453,13 @@ class App {
     }
 
     _onWsClose(e) {
-        console.log('[App] WS Closed:', e.code);
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        console.log(`[App] WS Closed (${isMobile ? 'Mobile' : 'Desktop'}):`, e.code, e.reason);
+        console.log('[App] WS Close details:', {
+            code: e.code,
+            reason: e.reason,
+            wasClean: e.wasClean
+        });
         state.setConnected(false);
 
         const statusEl = document.getElementById('connection-status');
@@ -389,7 +507,7 @@ class App {
                 minProtocol: 3,
                 maxProtocol: 3,
                 client: client,
-                auth: { token: AUTH_TOKEN },
+                auth: { token: this.authToken },
                 role: 'operator',
                 scopes: ['operator.admin', 'operator.write', 'operator.read']
             }
@@ -403,19 +521,33 @@ class App {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
         const id = this._generateId();
+        this.connectReqId = id;
 
-        // 响应 challenge 使用 connect.challenge 方法，而不是 connect
-        const challengeResponse = {
+        // 收到 challenge 后发送 connect 请求
+        const client = {
+            id: CLIENT_ID,
+            displayName: 'Team Chat Web',
+            version: '1.0.0',
+            platform: 'web',
+            mode: 'webchat'
+        };
+
+        const connectReq = {
             type: 'req',
             id,
-            method: 'connect.challenge',
+            method: 'connect',
             params: {
-                nonce: nonce
+                minProtocol: 3,
+                maxProtocol: 3,
+                client: client,
+                auth: { token: this.authToken },
+                role: 'operator',
+                scopes: ['operator.admin', 'operator.write', 'operator.read']
             }
         };
 
-        console.log('[App] Responding to challenge with connect.challenge');
-        this.ws.send(JSON.stringify(challengeResponse));
+        console.log('[App] Received challenge, sending connect request');
+        this.ws.send(JSON.stringify(connectReq));
     }
 
     _sendHeartbeat() {
@@ -444,16 +576,22 @@ class App {
     _scheduleReconnect() {
         if (this.isManualClose) return;
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+        
+        if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            console.log('[App] Max reconnect attempts reached, waiting for user action');
+            emit(EventTypes.UI_TOAST, { 
+                message: '连接失败，请检查网络后刷新页面', 
+                type: 'error' 
+            });
+            return;
+        }
 
-        const delay = Math.min(
-            RECONNECT_BASE_DELAY * Math.pow(2, this.reconnectAttempts),
-            RECONNECT_MAX_DELAY
-        );
+        const delay = RECONNECT_BASE_DELAY;
         this.reconnectAttempts++;
 
         console.log(`[App] Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
         emit(EventTypes.UI_TOAST, { 
-            message: `网络不稳定，${Math.ceil(delay / 1000)}秒后重连...`, 
+            message: `正在重连... (${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`, 
             type: 'info' 
         });
 
@@ -497,9 +635,6 @@ class App {
                 emit(EventTypes.UI_TOAST, { message: '连接成功', type: 'success' });
                 emit(EventTypes.CONNECTION_CHANGED, { connected: true });
                 emit('ws:open');  // 触发 ws:open 事件供 index.html 监听
-
-                // 检查是否需要发送状态汇报（至少间隔2小时）
-                this._sendStatusReportIfNeeded();
             } else {
                 console.error('[App] WS Handshake Failed:', msg.error);
                 const statusEl = document.getElementById('connection-status');
@@ -524,7 +659,19 @@ class App {
         
         const model = payload?.message?.model || null;
 
+        // 调试日志
+        console.log('[App] Chat message payload:', {
+            runId,
+            state: msgState,
+            sessionId: payload.sessionId,
+            contentTypes: Array.isArray(content) ? content.map(c => c?.type) : typeof content
+        });
+
         if (!runId) return;
+
+        // 使用正确的 sessionId
+        const currentSessionId = state.getStateValue('currentSessionId');
+        const effectiveSessionId = payload.sessionId || currentSessionId || runId;
 
         let thinking = null;
         const tools = [];
@@ -533,47 +680,55 @@ class App {
             for (const block of content) {
                 if (!block || typeof block !== 'object') continue;
                 
-                if ((block.type === 'thinking' || block.type === 'thought') && (block.thinking || block.thought)) {
-                    thinking = block.thinking || block.thought;
+                // 兼容多种 thinking 格式
+                if (block.type === 'thinking' || block.type === 'thought') {
+                    thinking = block.thinking || block.thought || block.content || '';
+                    console.log('[App] Found thinking block:', thinking.substring(0, 100));
                     emit('agent:thinking', { agentId: senderAgentId, content: thinking });
                 }
                 
-                if (block.type === 'tool_use') {
+                // 兼容多种 tool_use 格式
+                if (block.type === 'tool_use' || block.type === 'toolCall' || block.type === 'tool_call') {
+                    const toolName = block.name || block.toolName || 'unknown';
+                    const toolParams = block.input || block.params || block.arguments || {};
                     tools.push({
                         type: 'tool_use',
-                        name: block.name || 'unknown',
-                        params: block.input || {},
+                        name: toolName,
+                        params: toolParams,
                         status: 'running'
                     });
+                    console.log('[App] Found tool_use block:', toolName);
                     emit('agent:tool_call', { 
                         agentId: senderAgentId, 
-                        tool: block.name || 'unknown', 
-                        params: block.input || {} 
+                        tool: toolName, 
+                        params: toolParams 
                     });
                 }
                 
-                if (block.type === 'tool_result') {
+                // 兼容多种 tool_result 格式
+                if (block.type === 'tool_result' || block.type === 'toolResult') {
+                    const resultContent = block.content || block.result || '';
                     tools.push({
                         type: 'tool_result',
-                        result: block.content || '',
+                        result: resultContent,
                         status: block.is_error ? 'error' : 'success'
                     });
                     emit('agent:tool_result', { 
                         agentId: senderAgentId, 
                         tool: block.tool_use_id || 'unknown', 
-                        result: block.content || '' 
+                        result: resultContent 
                     });
                 }
             }
         }
 
         if (msgState === 'delta' && typeof text === 'string') {
-            this._handleDeltaMessage(runId, sender, senderAgentId, text, model, thinking, tools);
+            this._handleDeltaMessage(runId, sender, senderAgentId, text, model, thinking, tools, effectiveSessionId);
             return;
         }
 
         if (msgState === 'final') {
-            this._handleFinalMessage(runId, sender, senderAgentId, text, model, thinking, tools);
+            this._handleFinalMessage(runId, sender, senderAgentId, text, model, thinking, tools, effectiveSessionId);
             return;
         }
 
@@ -585,7 +740,8 @@ class App {
                 text: errMsg,
                 isUser: false,
                 type: 'error',
-                model: null
+                model: null,
+                sessionId: effectiveSessionId
             });
             this.runMessageEls.delete(runId);
 
@@ -599,7 +755,7 @@ class App {
         }
     }
 
-    _handleDeltaMessage(runId, sender, senderAgentId, text, model, thinking = null, tools = []) {
+    _handleDeltaMessage(runId, sender, senderAgentId, text, model, thinking = null, tools = [], sessionId = null) {
         let entry = this.runMessageEls.get(runId);
 
         if (!entry) {
@@ -608,14 +764,14 @@ class App {
                 return;
             }
 
-            entry = { sender, text: '', lastRenderTime: 0, sessionId: runId, thinking, tools };
+            entry = { sender, text: '', lastRenderTime: 0, sessionId: sessionId || runId, thinking, tools };
             this.runMessageEls.set(runId, entry);
 
             if (senderAgentId) {
                 state.clearPendingTimer(senderAgentId);
                 state.addAgentRun(senderAgentId, runId);
                 state.setAgentBusy(senderAgentId);
-                state.addOrUpdateSession(runId, senderAgentId, sender);
+                state.addOrUpdateSession(sessionId || runId, senderAgentId, sender);
                 emit(EventTypes.AGENT_BUSY, { agentId: senderAgentId });
             }
         }
@@ -631,9 +787,10 @@ class App {
         }
     }
 
-    _handleFinalMessage(runId, sender, senderAgentId, text, model, thinking = null, tools = []) {
+    _handleFinalMessage(runId, sender, senderAgentId, text, model, thinking = null, tools = [], sessionId = null) {
         const finalText = typeof text === 'string' ? text.trim() : '';
         const entry = this.runMessageEls.get(runId);
+        const effectiveSessionId = sessionId || (entry?.sessionId) || runId;
 
         if (senderAgentId) {
             state.clearPendingTimer(senderAgentId);
@@ -646,7 +803,7 @@ class App {
             }
 
             state.setLastSpeaker(sender);
-            state.addOrUpdateSession(runId, senderAgentId, sender);
+            state.addOrUpdateSession(effectiveSessionId, senderAgentId, sender);
 
             if (finalText) {
                 state.addAgentLog(senderAgentId, {
@@ -663,16 +820,43 @@ class App {
             this.runMessageEls.delete(runId);
             this.processedMessageIds.add(runId);
         } else if (finalText) {
+            const timestamp = Date.now();
             emit(EventTypes.MESSAGE_RECEIVED, {
                 sender,
                 text: finalText,
                 isUser: false,
                 type: 'final',
                 model: model || null,
-                sessionId: runId,
+                sessionId: effectiveSessionId,
                 thinking: thinking,
-                tools: tools
+                tools: tools,
+                timestamp
             });
+            this._updateLastMessageTimestamp(timestamp);
+        }
+
+        // 保存 Agent 消息到服务器历史记录
+        if (finalText && senderAgentId) {
+            const agentMessage = {
+                sender,
+                text: finalText,
+                isUser: false,
+                timestamp: Date.now(),
+                model: model || null,
+                sessionId: effectiveSessionId,
+                agentId: senderAgentId,
+                runId
+            };
+            apiService.saveMessage(agentMessage).catch(e => {
+                console.error('[App] Failed to save agent message to server:', e);
+            });
+        }
+    }
+
+    _updateLastMessageTimestamp(timestamp) {
+        if (timestamp > this.lastMessageTimestamp) {
+            this.lastMessageTimestamp = timestamp;
+            localStorage.setItem('lastMessageTimestamp', timestamp.toString());
         }
     }
 
@@ -741,6 +925,8 @@ class App {
         const agent = state.getAgentById(agentId);
         const agentName = agent?.name || agentId;
 
+        const sessionId = `session-${agentId}`;
+
         const sessionKey = `agent:${agentId}:${agentId}`;
         const contextMessage = `【本地群聊 Team Chat】老板：\n${message.replace(/@[^\s]+\s*/g, '').trim()}`;
 
@@ -751,7 +937,8 @@ class App {
             params: {
                 agentId: agentId,
                 sessionKey: sessionKey,
-                message: contextMessage
+                message: contextMessage,
+                sessionId: sessionId
             }
         };
 
@@ -853,48 +1040,6 @@ class App {
             return crypto.randomUUID();
         }
         return Math.random().toString(36).slice(2) + Date.now().toString(36);
-    }
-
-    /**
-     * 检查是否需要提醒小龙虾汇报进度
-     * 限制：至少间隔2小时，避免刷新页面重复触发
-     */
-    _sendStatusReportIfNeeded() {
-        const STORAGE_KEY = 'lastStatusReportTime';
-        const SESSION_KEY = 'statusReportSession';
-        const MIN_INTERVAL = 2 * 60 * 60 * 1000; // 2小时
-
-        const lastReportTime = parseInt(localStorage.getItem(STORAGE_KEY) || '0');
-        const lastSession = localStorage.getItem(SESSION_KEY);
-        const currentSession = this.sessionId || 'unknown';
-        const now = Date.now();
-
-        // 检查是否在当前会话中已经发送过
-        if (lastSession === currentSession) {
-            console.log('[App] Status report already sent in this session');
-            return;
-        }
-
-        // 检查时间间隔
-        if (now - lastReportTime < MIN_INTERVAL) {
-            console.log('[App] Status report reminder skipped, last reminder was', new Date(lastReportTime).toLocaleString());
-            return;
-        }
-
-        // 更新最后提醒时间和会话
-        localStorage.setItem(STORAGE_KEY, now.toString());
-        localStorage.setItem(SESSION_KEY, currentSession);
-
-        // 只提醒小龙虾汇报进度，具体内容由她自己决定
-        const reminder = `@小龙虾 请汇报当前各Agent的任务进度和状态。`;
-
-        setTimeout(() => {
-            emit(EventTypes.MESSAGE_SENT, {
-                text: reminder,
-                agentId: 'main'
-            });
-            console.log('[App] Status report reminder sent at', new Date().toLocaleString());
-        }, 1000);
     }
 
     destroy() {

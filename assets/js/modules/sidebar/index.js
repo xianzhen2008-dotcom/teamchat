@@ -160,6 +160,12 @@ class SidebarModule {
         const agentBusyMap = stateManager.getState('agentBusyMap') || new Map();
         const agentActivity = stateManager.getState('agentActivity') || new Map();
         const isConnected = stateManager.getState('isConnected') || false;
+        
+        console.log("SIDEBAR_RENDER_20260317", { 
+            agentCount: agents.length, 
+            busyMap: Object.fromEntries(agentBusyMap), 
+            activityMap: Object.fromEntries(agentActivity) 
+        });
 
         if (!this.agentListEl) {
             this.agentListEl = $('.agent-list', this.container);
