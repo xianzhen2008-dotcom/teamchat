@@ -1,13 +1,15 @@
 // 管理 API 处理函数
 const path = require('path');
-const OPENCLAW_HOME = process.env.OPENCLAW_HOME || "/Users/wusiwei/.openclaw";
+const os = require('os');
+const OPENCLAW_HOME = process.env.OPENCLAW_HOME || path.join(os.homedir(), '.openclaw');
 
 // 重启网关
 async function handleRestartGateway(req, res) {
   console.log('[ADMIN] Restarting Gateway...');
   try {
     const { exec } = require('child_process');
-    exec('pkill -f "node.*gateway-monitor" && sleep 1 && node ~/.openclaw/workspace/lib/gateway-monitor.js &', (error, stdout, stderr) => {
+    const gatewayMonitor = path.join(OPENCLAW_HOME, 'workspace', 'lib', 'gateway-monitor.js');
+    exec(`pkill -f "node.*gateway-monitor" && sleep 1 && node "${gatewayMonitor}" &`, (error, stdout, stderr) => {
       if (error) {
         console.error('[ADMIN] Failed to restart gateway:', error);
         res.writeHead(500, { "Content-Type": "application/json" });
@@ -30,10 +32,16 @@ function handleRestartTeamChat(req, res) {
   console.log('[ADMIN] Restarting TeamChat...');
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ success: true, message: 'TeamChat 将在 3 秒后重启' }));
-  
+
   setTimeout(() => {
     const { spawn } = require('child_process');
-    const child = spawn('node', [__filename], { detached: true, stdio: 'ignore' });
+    const serverEntry = path.join(__dirname, 'team_chat_server.cjs');
+    const child = spawn(process.execPath, [serverEntry], {
+      detached: true,
+      stdio: 'ignore',
+      cwd: __dirname,
+      env: process.env,
+    });
     child.unref();
     process.exit(0);
   }, 3000);
@@ -44,7 +52,7 @@ async function handleRestartTunnel(req, res) {
   console.log('[ADMIN] Restarting Tunnel...');
   try {
     const { exec } = require('child_process');
-    const OPENCLAW_HOME = process.env.OPENCLAW_HOME || '/Users/wusiwei/.openclaw';
+    const OPENCLAW_HOME = process.env.OPENCLAW_HOME || path.join(require('os').homedir(), '.openclaw');
     const logFile = `${OPENCLAW_HOME}/logs/tunnel_team_chat.log`;
     
     // 停止旧的 tunnel 进程

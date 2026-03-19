@@ -5,8 +5,10 @@ const { promisify } = require('util');
 
 const execAsync = promisify(exec);
 
-const MUSE_DIR = path.join(process.env.HOME || '/Users/wusiwei', '.openclaw', '.muse');
-const TASKS_FILE = path.join(process.env.HOME || '/Users/wusiwei', '.openclaw', 'tasks', 'todo.json');
+const os = require('os');
+const OPENCLAW_HOME = process.env.OPENCLAW_HOME || path.join(os.homedir(), '.openclaw');
+const MUSE_DIR = path.join(OPENCLAW_HOME, '.muse');
+const TASKS_FILE = path.join(OPENCLAW_HOME, 'tasks', 'todo.json');
 
 async function handleMuseApi(req, res, urlPath, method) {
     const url = new URL(urlPath, 'http://localhost');

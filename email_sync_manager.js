@@ -19,7 +19,7 @@ class EmailSyncManager {
         this.lastSyncTime = null;
         this.newEmailsCount = 0;
         this.dbPath = path.join(__dirname, 'emails.db');
-        this.archiveDir = path.join(process.env.HOME || '/Users/wusiwei', '.openclaw', 'email_archive');
+        this.archiveDir = path.join(process.env.OPENCLAW_HOME || path.join(process.env.HOME || require('os').homedir(), '.openclaw'), 'email_archive');
         
         // 确保 comprehensive_sync.js 中的变量可用
         this.MONTH_NAMES = [
