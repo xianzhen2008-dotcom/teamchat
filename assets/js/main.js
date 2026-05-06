@@ -1,65 +1,136 @@
 /**
  * Main Entry - 应用入口
+ * Version: 255 - Mobile browser compatibility mode
  */
+
+console.log('%c[Main] Loading TeamChat OSS build', 'background: #00d4ff; color: black; font-size: 14px; padding: 4px 8px; border-radius: 4px;');
 
 import { stateManager } from './core/state.js';
 import { eventBus } from './core/events.js';
-import { App } from './core/app.js';
-
-import { websocketService } from './services/websocket.js';
+import { App, EventTypes } from './core/app.js';
 import { avatarService } from './services/avatar.js';
 import { apiService } from './services/api.js';
+import { AGENT_ORDER, compareAgentsByOrder, dedupeAgents, getAgentDisplayName, getAgentRole, normalizeAgentId, normalizeAgentRecord } from './utils/agent-meta.js';
+import { isMessageHidden } from './utils/message-meta.js';
 
 import { sidebarModule } from './modules/sidebar/index.js';
 import { messagesModule } from './modules/messages/index.js';
 import { inputModule } from './modules/input/index.js';
 import { filterModule } from './modules/filter/index.js';
 import { searchModule } from './modules/search/index.js';
+import { teamchatNotificationsModule } from './modules/notifications/index.js';
 import { statusDashboard } from './modules/dashboard/status.js';
 import { metricsDashboard } from './modules/dashboard/metrics.js';
 import { emailMonitorDashboard } from './modules/dashboard/email-monitor.js';
 import { themeModule } from './modules/theme/index.js';
+import { initPwaSupport } from './services/pwa.js';
 
 // 根据 Agent ID 或名称获取对应的头像文件
 function getAgentAvatar(agentId, agentName) {
+    const normalizedId = normalizeAgentId(agentId) || normalizeAgentId(agentName) || agentId;
     const avatarMap = {
-        // 按 ID 映射
-        'main': 'compressed/小龙虾_compressed.jpg',
-        'lobster': 'compressed/小龙虾_compressed.jpg',
-        'writer': 'compressed/小文 2_compressed.jpg',
-        'mail': 'compressed/小邮_compressed.jpg',
-        'data': 'compressed/小数_compressed.jpg',
-        'qa': 'compressed/小测_compressed.jpg',
-        'pm': 'compressed/小产_compressed.jpg',
-        'dev': 'compressed/小码_compressed.jpg',
-        'backend': 'compressed/小后_compressed.jpg',
-        'frontend': 'compressed/小前_compressed.jpg',
-        'mobile': 'compressed/小移_compressed.jpg',
-        'devops': 'compressed/小运_compressed.jpg',
-        'finance': 'compressed/小财_compressed.jpg',
-        // 按名称映射
-        '小龙虾': 'compressed/小龙虾_compressed.jpg',
-        '小文': 'compressed/小文 2_compressed.jpg',
-        '小写': 'compressed/小文 2_compressed.jpg',
-        '小邮': 'compressed/小邮_compressed.jpg',
-        '小数': 'compressed/小数_compressed.jpg',
-        '小测': 'compressed/小测_compressed.jpg',
-        '小产': 'compressed/小产_compressed.jpg',
-        '小码': 'compressed/小码_compressed.jpg',
-        '小后': 'compressed/小后_compressed.jpg',
-        '小前': 'compressed/小前_compressed.jpg',
-        '小移': 'compressed/小移_compressed.jpg',
-        '小运': 'compressed/小运_compressed.jpg',
-        '小财': 'compressed/小财_compressed.jpg'
+        main: 'agent-main.svg',
+        writer: 'agent-writer.svg',
+        mail: 'agent-mail.svg',
+        data: 'agent-data.svg',
+        qa: 'agent-qa.svg',
+        pm: 'agent-pm.svg',
+        dev: 'agent-dev.svg',
+        backend: 'agent-be.svg',
+        frontend: 'agent-fe.svg',
+        mobile: 'agent-mobile.svg',
+        devops: 'agent-ops.svg',
+        finance: 'agent-finance.svg'
     };
-    
-    // 优先使用 ID 映射，其次使用名称映射
-    return avatarMap[agentId] || avatarMap[agentName] || 'compressed/小龙虾_compressed.jpg';
+
+    return avatarMap[normalizedId] || 'agent-main.svg';
 }
 
 // 远程访问检测
 const IS_REMOTE = !['localhost', '127.0.0.1', ''].includes(window.location.hostname);
 const SESSION_KEY = 'team_chat_session';
+const GATEWAY_TOKEN_KEY = 'team_chat_token';
+const HOME_DIR = '';
+const OPENCLAW_HOME = '';
+const WORKSPACE_ROOT = '';
+const TEAMCHAT_ROOT = '';
+
+window.stateManager = stateManager;
+window.__TEAMCHAT_IS_MESSAGE_HIDDEN__ = isMessageHidden;
+
+function isAppWebView() {
+    return Boolean(window.Capacitor)
+        || /; wv\)|TeamChat/i.test(navigator.userAgent || '')
+        || document.body?.dataset.mobileRecovery === 'true';
+}
+
+function resolveAppUrl(url) {
+    try {
+        return new URL(url, window.location.origin);
+    } catch {
+        return null;
+    }
+}
+
+function navigateInApp(url, { desktopNewTab = true } = {}) {
+    const nextUrl = resolveAppUrl(url);
+    if (!nextUrl) return false;
+
+    const sameOrigin = nextUrl.origin === window.location.origin;
+    if (isAppWebView() || !desktopNewTab || sameOrigin) {
+        window.location.assign(nextUrl.href);
+    } else {
+        window.open(nextUrl.href, '_blank', 'noopener');
+    }
+    return true;
+}
+
+function initMobileViewportRecovery() {
+    const root = document.documentElement;
+    const body = document.body;
+    if (!root || !body) return;
+
+    const detectMobileCompatMode = () => {
+        const ua = String(navigator.userAgent || '').toLowerCase();
+        const isAndroid = /android/.test(ua);
+        const problematicBrowser = /(quark|huawei|honor|heytapbrowser|miuibrowser|ucbrowser|mqqbrowser|qqbrowser|baiduboxapp|sogoumobilebrowser|vivo(?:browser)?|oppo(?:browser)?)/i.test(ua);
+        const modernChromeFamily = /(chrome|crios|edga|edgios|samsungbrowser)/i.test(ua);
+
+        if (problematicBrowser) return 'legacy-android';
+        if (isAndroid && !modernChromeFamily) return 'legacy-android';
+        return 'standard';
+    };
+
+    const isTouchDevice = () => Boolean(
+        'ontouchstart' in window
+        || navigator.maxTouchPoints > 0
+        || navigator.msMaxTouchPoints > 0
+    );
+
+    const updateViewportState = () => {
+        const viewportHeight = Math.max(
+            Math.round(window.visualViewport?.height || 0),
+            Math.round(window.innerHeight || 0),
+            Math.round(document.documentElement?.clientHeight || 0)
+        );
+        if (viewportHeight > 0) {
+            root.style.setProperty('--app-height', `${viewportHeight}px`);
+        }
+
+        const isNarrow = window.matchMedia?.('(max-width: 768px)')?.matches || false;
+        const mobileRecovery = isNarrow;
+        body.dataset.mobileRecovery = mobileRecovery ? 'true' : 'false';
+        body.dataset.mobileViewport = isNarrow ? 'narrow' : 'wide';
+        body.dataset.mobileTouch = isTouchDevice() ? 'true' : 'false';
+        body.dataset.mobileCompat = detectMobileCompatMode();
+    };
+
+    updateViewportState();
+    window.addEventListener('resize', updateViewportState, { passive: true });
+    window.addEventListener('orientationchange', updateViewportState, { passive: true });
+    window.visualViewport?.addEventListener('resize', updateViewportState, { passive: true });
+    window.visualViewport?.addEventListener('scroll', updateViewportState, { passive: true });
+}
 
 // Session管理
 function getSessionToken() {
@@ -78,6 +149,124 @@ function setSessionToken(token) {
     } else {
         localStorage.removeItem(SESSION_KEY);
     }
+}
+
+function getAuthHeaders(extraHeaders = {}) {
+    const sessionToken = getSessionToken();
+    if (!sessionToken) {
+        return extraHeaders;
+    }
+    return {
+        ...extraHeaders,
+        'X-Session-Token': sessionToken
+    };
+}
+
+function normalizeLocalPath(rawPath) {
+    const value = String(rawPath || '').trim();
+    if (!value) return '';
+
+    let decoded = value;
+    try {
+        decoded = decodeURIComponent(value);
+    } catch {}
+
+    if (/^https?:\/\//i.test(decoded)) {
+        try {
+            const url = new URL(decoded, window.location.origin);
+            if (url.pathname.startsWith('/uploads/')) {
+                decoded = `${TEAMCHAT_ROOT}${url.pathname}`;
+            } else {
+                return decoded;
+            }
+        } catch {
+            return decoded;
+        }
+    }
+
+    if (decoded.startsWith('file://')) {
+        decoded = decoded.replace(/^file:\/\//, '');
+    }
+
+    if (decoded.startsWith('/uploads/')) {
+        decoded = `${TEAMCHAT_ROOT}${decoded}`;
+    } else if (decoded.startsWith('~/')) {
+        decoded = `${HOME_DIR}${decoded.slice(1)}`;
+    } else if (decoded.startsWith('./') || decoded.startsWith('../')) {
+        decoded = `${TEAMCHAT_ROOT}/${decoded}`;
+    } else if (!decoded.startsWith('/')) {
+        decoded = `${TEAMCHAT_ROOT}/${decoded}`;
+    }
+
+    const normalized = [];
+    for (const part of decoded.split('/')) {
+        if (!part || part === '.') continue;
+        if (part === '..') {
+            normalized.pop();
+            continue;
+        }
+        normalized.push(part);
+    }
+    return `/${normalized.join('/')}`;
+}
+
+async function copyLocalPath(filePath, appName, shortcut, customMessage = '') {
+    const resolvedPath = normalizeLocalPath(filePath);
+    await navigator.clipboard.writeText(resolvedPath);
+    eventBus.emit('toast:show', {
+        message: customMessage || `路径已复制，在${appName}中按 ${shortcut} 粘贴打开`,
+        type: 'success',
+        duration: 4000
+    });
+    return resolvedPath;
+}
+
+function getQueryGatewayToken() {
+    return new URLSearchParams(location.search).get('token') || '';
+}
+
+function getCachedGatewayToken() {
+    return localStorage.getItem(GATEWAY_TOKEN_KEY) || '';
+}
+
+function persistGatewayToken(token) {
+    if (token) {
+        localStorage.setItem(GATEWAY_TOKEN_KEY, token);
+    } else {
+        localStorage.removeItem(GATEWAY_TOKEN_KEY);
+    }
+}
+
+async function resolveGatewayToken() {
+    const urlToken = getQueryGatewayToken();
+    if (urlToken) {
+        persistGatewayToken(urlToken);
+        return { token: urlToken, source: 'url' };
+    }
+
+    try {
+        const tokenResp = await fetch('/api/gateway-token', {
+            headers: getAuthHeaders()
+        });
+        if (tokenResp.ok) {
+            const tokenData = await tokenResp.json();
+            if (tokenData?.token) {
+                persistGatewayToken(tokenData.token);
+                return { token: tokenData.token, source: 'server' };
+            }
+        }
+    } catch (e) {
+        console.error('Failed to fetch gateway token:', e);
+    }
+
+    const cachedToken = getCachedGatewayToken();
+    if (cachedToken) {
+        console.warn('[Main] Falling back to cached gateway token');
+        return { token: cachedToken, source: 'cache' };
+    }
+
+    persistGatewayToken('');
+    return { token: '', source: 'none' };
 }
 
 async function checkAuthStatus() {
@@ -113,111 +302,80 @@ async function login(password) {
 }
 
 function showLoginDialog() {
-    const password = prompt('请输入访问口令：');
-    if (password) {
-        login(password).then(success => {
-            if (success) {
-                initApp();
-            } else {
-                alert('口令错误，请重试');
-                showLoginDialog();
-            }
-        });
-    }
+    const currentUrl = new URL(window.location.href);
+    const session = getSessionToken();
+    const redirectUrl = session
+        ? `/team_chat_login.html?session=${encodeURIComponent(session)}&returnTo=${encodeURIComponent(currentUrl.pathname + currentUrl.search)}`
+        : `/team_chat_login.html?returnTo=${encodeURIComponent(currentUrl.pathname + currentUrl.search)}`;
+
+    window.location.replace(redirectUrl);
 }
 
+let appInitialized = false;
+
+initPwaSupport();
+initMobileViewportRecovery();
+
 async function initApp() {
-    // 动态从服务器获取 Gateway Token
-    let AUTH_TOKEN = new URLSearchParams(location.search).get('token') || localStorage.getItem('team_chat_token');
-    if (!AUTH_TOKEN) {
-        try {
-            const tokenResp = await fetch('/api/gateway-token');
-            if (tokenResp.ok) {
-                const tokenData = await tokenResp.json();
-                AUTH_TOKEN = tokenData.token;
-            }
-        } catch (e) {
-            console.error('Failed to fetch gateway token:', e);
-        }
+    if (appInitialized) {
+        console.log('[Main] App already initialized, skipping');
+        return;
     }
-    const MAIN_KEY = 'main-key';
+    appInitialized = true;
+    
+    const { token: AUTH_TOKEN, source: authTokenSource } = await resolveGatewayToken();
+    apiService.setAuthToken(AUTH_TOKEN);
 
     // 从 Gateway 获取真实的 agents 列表
     let agents = [];
     try {
-        const resp = await fetch('/api/agents');
+        const resp = await fetch('/api/agents', {
+            headers: getAuthHeaders()
+        });
         if (resp.ok) {
             const data = await resp.json();
             // API 可能返回数组或对象
             const agentList = Array.isArray(data) ? data : (data.agents || data.list || []);
-            agents = agentList.map(a => ({
-                agentId: a.id,
-                name: a.name || a.id,
-                img: getAgentAvatar(a.id, a.name),
-                role: a.role || a.name || a.id
+            agents = dedupeAgents(agentList.map((agent) => {
+                const normalized = normalizeAgentRecord({
+                    id: agent.id,
+                    agentId: agent.id,
+                    name: agent.name || agent.id,
+                    role: agent.role || ''
+                });
+                return {
+                    ...normalized,
+                    img: getAgentAvatar(normalized.agentId, normalized.name),
+                    role: normalized.role || getAgentRole(normalized.agentId, normalized.name)
+                };
             }));
         }
     } catch (e) {
         console.warn('Failed to fetch agents, using default list:', e);
     }
 
-    // Agent 排序配置：常用优先，开发组（除小码外）排到最后
-    const AGENT_ORDER = [
-        'main',    // 小龙虾 - 团队主管（最常用）
-        'writer',  // 小文 - 写作助手
-        'mail',    // 小邮 - 邮件助手
-        'data',    // 小数 - 数据分析师
-        'qa',      // 小测 - 测试专家
-        'pm',      // 小产 - 产品经理
-        'dev',     // 小码 - 开发专家（开发组唯一靠前的）
-        // 开发组其他成员排到最后
-        'frontend', // 小前 - 前端专家
-        'backend',  // 小后 - 后端专家
-        'mobile',   // 小移 - 移动开发
-        'devops',   // 小运 - 运维专家
-        'finance'   // 小财 - 财务助手
-    ];
-
-    // 对 agents 进行排序
-    agents.sort((a, b) => {
-        const aIndex = AGENT_ORDER.indexOf(a.agentId);
-        const bIndex = AGENT_ORDER.indexOf(b.agentId);
-        
-        // 如果在排序列表中，按列表顺序
-        if (aIndex !== -1 && bIndex !== -1) {
-            return aIndex - bIndex;
-        }
-        
-        // 如果只有 a 在列表中，a 排前面
-        if (aIndex !== -1) return -1;
-        
-        // 如果只有 b 在列表中，b 排前面
-        if (bIndex !== -1) return 1;
-        
-        // 都不在列表中，按名称排序
-        return a.name.localeCompare(b.name);
-    });
+    agents = dedupeAgents(agents).sort(compareAgentsByOrder);
 
     // 如果获取失败，使用默认列表
     if (agents.length === 0) {
-        agents = [
-            { agentId: 'main', name: '小龙虾', img: 'compressed/小龙虾_compressed.jpg', role: '团队主管' },
-            { agentId: 'writer', name: '小文', img: 'compressed/小文 2_compressed.jpg', role: '写作助手' },
-            { agentId: 'mail', name: '小邮', img: 'compressed/小邮_compressed.jpg', role: '邮件助手' },
-            { agentId: 'data', name: '小数', img: 'compressed/小数_compressed.jpg', role: '数据分析师' },
-            { agentId: 'qa', name: '小测', img: 'compressed/小测_compressed.jpg', role: '测试专家' },
-            { agentId: 'pm', name: '小产', img: 'compressed/小产_compressed.jpg', role: '产品经理' },
-            { agentId: 'dev', name: '小码', img: 'compressed/小码_compressed.jpg', role: '开发专家' },
-        ];
+        agents = dedupeAgents(AGENT_ORDER.map((agentId) => ({
+            agentId,
+            name: getAgentDisplayName(agentId),
+            img: getAgentAvatar(agentId, agentId),
+            role: getAgentRole(agentId)
+        })));
     }
 
-    stateManager.setState('agents', agents);
-    stateManager.setState('currentAgent', agents[0]);
+    stateManager.setState({ agents });
+    stateManager.setState({ currentAgent: agents[0] });
 
     // 预加载所有 Agent 的头像（传入文件名数组）
     avatarService.preloadAll(agents.map(a => a.img));
 
-    const app = new App({ authToken: AUTH_TOKEN });
+    const app = new App({
+        authToken: AUTH_TOKEN || null,
+        authTokenSource
+    });
 
     // 设置 apiService 的 token
     apiService.setAuthToken(AUTH_TOKEN);
@@ -232,6 +390,10 @@ async function initApp() {
         container: document.getElementById('messages-view')
     });
 
+    teamchatNotificationsModule.init({
+        container: document.getElementById('teamchat-notice-strip')
+    });
+
     inputModule.init({
         container: document.getElementById('input-area'),
         input: document.getElementById('chat-input'),
@@ -244,7 +406,8 @@ async function initApp() {
     filterModule.init({
         panel: document.getElementById('filter-panel'),
         overlay: document.getElementById('filter-panel-overlay'),
-        grid: document.getElementById('filter-agent-grid')
+        grid: document.getElementById('filter-agent-grid'),
+        optionsContainer: document.getElementById('filter-options')
     });
     console.log("EVENT_BOUND_FILTER_INIT", { panel: !!document.getElementById('filter-panel') });
 
@@ -258,33 +421,17 @@ async function initApp() {
     metricsDashboard.init();
     emailMonitorDashboard.init();
 
-    // 从服务器加载历史消息
-    async function loadHistoryFromServer() {
-        try {
-            const apiHost = window.location.port === '5173' ? 'http://localhost:18788' : window.location.origin;
-            const res = await fetch(`${apiHost}/history?token=${AUTH_TOKEN}`);
-            if (res.ok) {
-                const serverHistory = await res.json();
-                console.log(`[History] 从服务器加载 ${serverHistory.length} 条历史消息`);
-                stateManager.loadHistory(serverHistory);
-                console.log("HISTORY_RE_RENDERED_20260317", { count: serverHistory.length });
-            } else {
-                console.error('[History] 加载失败:', res.status);
-            }
-        } catch (e) {
-            console.error('[History] 加载错误:', e);
-        }
-    }
-
-    loadHistoryFromServer();
-
     // 初始化主题
     themeModule.init();
     
     // 初始化工作日志按钮（桌面端和移动端）
     const statusToggle = document.getElementById('status-toggle');
     const statusToggle2 = document.getElementById('status-toggle-2');
-    const handleStatusToggle = () => {
+    console.log('[Main] Status toggle buttons:', { statusToggle: !!statusToggle, statusToggle2: !!statusToggle2 });
+    const handleStatusToggle = (e) => {
+        console.log('[Main] Status toggle clicked', e.target.id);
+        e.stopPropagation();
+        e.preventDefault();
         statusDashboard.show();
         // 关闭下拉菜单
         const dropdown = document.getElementById('header-dropdown');
@@ -292,9 +439,11 @@ async function initApp() {
     };
     if (statusToggle) {
         statusToggle.addEventListener('click', handleStatusToggle);
+        console.log('[Main] Bound status-toggle click event');
     }
     if (statusToggle2) {
         statusToggle2.addEventListener('click', handleStatusToggle);
+        console.log('[Main] Bound status-toggle-2 click event');
     }
 
     // 初始化性能监控按钮（桌面端和移动端）
@@ -315,16 +464,66 @@ async function initApp() {
     // 初始化邮件监控按钮（桌面端和移动端）
     const emailMonitorToggle = document.getElementById('email-monitor-toggle');
     const emailMonitorToggle2 = document.getElementById('email-monitor-toggle-2');
-    const handleEmailMonitorToggle = () => {
+    console.log('[Main] Email monitor toggle buttons:', { emailMonitorToggle: !!emailMonitorToggle, emailMonitorToggle2: !!emailMonitorToggle2 });
+    const handleEmailMonitorToggle = (e) => {
+        console.log('[Main] Email monitor toggle clicked', e?.target?.id);
+        e?.stopPropagation?.();
+        e?.preventDefault?.();
         emailMonitorDashboard.toggle();
         const dropdown = document.getElementById('header-dropdown');
         if (dropdown) dropdown.classList.remove('show');
     };
     if (emailMonitorToggle) {
         emailMonitorToggle.addEventListener('click', handleEmailMonitorToggle);
+        console.log('[Main] Bound email-monitor-toggle click event');
     }
     if (emailMonitorToggle2) {
         emailMonitorToggle2.addEventListener('click', handleEmailMonitorToggle);
+        console.log('[Main] Bound email-monitor-toggle-2 click event');
+    }
+
+    // 初始化智库日报按钮（桌面端和移动端）- 跳转到远程链接
+    const brainDailyToggle = document.getElementById('brain-daily-toggle');
+    const brainDailyToggle2 = document.getElementById('brain-daily-toggle-2');
+    console.log('[Main] Brain daily toggle buttons:', { brainDailyToggle: !!brainDailyToggle, brainDailyToggle2: !!brainDailyToggle2 });
+    const handleBrainDailyToggle = (e) => {
+        console.log('[Main] Brain daily toggle clicked');
+        e?.stopPropagation?.();
+        e?.preventDefault?.();
+        // APK/WebView 和移动浏览器常拦截新窗口，智库入口优先使用同页跳转。
+        navigateInApp('/brain/');
+        const dropdown = document.getElementById('header-dropdown');
+        if (dropdown) dropdown.classList.remove('show');
+    };
+    if (brainDailyToggle) {
+        brainDailyToggle.addEventListener('click', handleBrainDailyToggle);
+        console.log('[Main] Bound brain-daily-toggle click event');
+    }
+    if (brainDailyToggle2) {
+        brainDailyToggle2.addEventListener('click', handleBrainDailyToggle);
+        console.log('[Main] Bound brain-daily-toggle-2 click event');
+    }
+
+    // 初始化 OpenClaw WebUI 按钮（桌面端和移动端）- 跳转到网关后台
+    const openclawWebuiToggle = document.getElementById('openclaw-webui-toggle');
+    const openclawWebuiToggle2 = document.getElementById('openclaw-webui-toggle-2');
+    console.log('[Main] OpenClaw WebUI toggle buttons:', { openclawWebuiToggle: !!openclawWebuiToggle, openclawWebuiToggle2: !!openclawWebuiToggle2 });
+    const handleOpenclawWebuiToggle = (e) => {
+        console.log('[Main] OpenClaw WebUI toggle clicked');
+        e?.stopPropagation?.();
+        e?.preventDefault?.();
+        // APK 内用同 WebView 跳转，保留系统返回键历史栈。
+        navigateInApp('/v1/gateway');
+        const dropdown = document.getElementById('header-dropdown');
+        if (dropdown) dropdown.classList.remove('show');
+    };
+    if (openclawWebuiToggle) {
+        openclawWebuiToggle.addEventListener('click', handleOpenclawWebuiToggle);
+        console.log('[Main] Bound openclaw-webui-toggle click event');
+    }
+    if (openclawWebuiToggle2) {
+        openclawWebuiToggle2.addEventListener('click', handleOpenclawWebuiToggle);
+        console.log('[Main] Bound openclaw-webui-toggle-2 click event');
     }
 
     // 初始化搜索按钮（桌面端和移动端）
@@ -361,30 +560,39 @@ async function initApp() {
         filterToggle2.addEventListener('click', handleFilterToggle);
     }
     
-    // 初始化锁屏按钮
+    // 初始化锁屏按钮（桌面端和移动端）
     const scrollLockBtn = document.getElementById('scroll-lock-toggle');
+    const scrollLockBtn2 = document.getElementById('scroll-lock-toggle-2');
+    const handleScrollLock = () => {
+        messagesModule.toggleScrollLock();
+        const dropdown = document.getElementById('header-dropdown');
+        if (dropdown) dropdown.classList.remove('show');
+    };
     if (scrollLockBtn) {
-        scrollLockBtn.addEventListener('click', () => {
-            messagesModule.toggleScrollLock();
-        });
+        scrollLockBtn.addEventListener('click', handleScrollLock);
+    }
+    if (scrollLockBtn2) {
+        scrollLockBtn2.addEventListener('click', handleScrollLock);
     }
 
     // 初始化邮件链接
     const mailLink = document.getElementById('mail-link') || document.getElementById('mail-link-2');
     if (mailLink) {
-        fetch('/api/mail-tunnel')
+        fetch('/api/mail-tunnel', {
+            headers: getAuthHeaders()
+        })
             .then(res => res.json())
             .then(data => {
                 const mailUrl = data.url;
                 if (mailUrl) {
                     mailLink.href = mailUrl;
                 } else {
-                    mailLink.href = 'http://localhost:3456';
+                    mailLink.href = 'http://localhost:3001';
                 }
             })
             .catch(err => {
                 console.warn('[Mail] Failed to fetch mail tunnel URL:', err);
-                mailLink.href = 'http://localhost:3456';
+                mailLink.href = 'http://localhost:3001';
             });
     }
 
@@ -392,20 +600,66 @@ async function initApp() {
     const moreToggle = document.getElementById('more-toggle');
     const headerDropdown = document.getElementById('header-dropdown');
     if (moreToggle && headerDropdown) {
+        const closeHeaderDropdown = () => {
+            headerDropdown.classList.remove('show');
+        };
+
         moreToggle.addEventListener('click', (e) => {
+            e.preventDefault();
             e.stopPropagation();
             headerDropdown.classList.toggle('show');
         });
         
         document.addEventListener('click', (e) => {
-            if (!headerDropdown.contains(e.target) && e.target !== moreToggle) {
-                headerDropdown.classList.remove('show');
+            const target = e.target instanceof Node ? e.target : null;
+            if (!target) return;
+            if (!headerDropdown.contains(target) && !moreToggle.contains(target)) {
+                closeHeaderDropdown();
             }
         });
         
-        headerDropdown.addEventListener('click', () => {
-            headerDropdown.classList.remove('show');
+        headerDropdown.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const target = e.target.closest('a, .dropdown-item');
+            const link = e.target.closest('a[href]');
+            if (link && isAppWebView()) {
+                const nextUrl = resolveAppUrl(link.getAttribute('href'));
+                if (nextUrl && nextUrl.origin === window.location.origin) {
+                    e.preventDefault();
+                    closeHeaderDropdown();
+                    navigateInApp(nextUrl.href, { desktopNewTab: false });
+                    return;
+                }
+            }
+            // 如果点击的是按钮（有ID），不在这里关闭dropdown，让按钮自己的处理程序来关闭
+            if (target && target.id) {
+                // 有ID的按钮，不在这里处理，让按钮自己的事件处理程序处理
+                return;
+            }
+            // 只有没有ID的链接项才在这里关闭
+            if (target) {
+                closeHeaderDropdown();
+            }
         });
+
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 768) {
+                closeHeaderDropdown();
+            }
+        });
+
+        const wptDashboardLink = document.getElementById('wpt-dashboard-link');
+        if (wptDashboardLink) {
+            wptDashboardLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                const session = getSessionToken();
+                const nextUrl = session
+                    ? `/wpt-dashboard/?session=${encodeURIComponent(session)}`
+                    : '/wpt-dashboard/';
+                navigateInApp(nextUrl);
+                closeHeaderDropdown();
+            });
+        }
     }
 
     // 连接状态监听
@@ -445,11 +699,14 @@ async function initApp() {
         
         const mentionMatch = text.match(/@(\S+)/);
         if (mentionMatch) {
-            const mentionName = mentionMatch[1];
-            targetAgent = agents.find(a => 
-                a.name.toLowerCase() === mentionName.toLowerCase() ||
-                a.agentId.toLowerCase() === mentionName.toLowerCase()
-            );
+            const mentionName = mentionMatch[1].replace(/[,:;：；，。!?！？]+$/u, '');
+            targetAgent = stateManager.getAgentByName?.(mentionName) || null;
+            if (!targetAgent) {
+                const normalizedMentionId = normalizeAgentId(mentionName);
+                if (normalizedMentionId) {
+                    targetAgent = agents.find(a => normalizeAgentId(a.agentId || a.id || a.name) === normalizedMentionId) || null;
+                }
+            }
         }
         
         if (!targetAgent) {
@@ -464,7 +721,7 @@ async function initApp() {
         }
         
         if (!targetAgent) {
-            targetAgent = agents.find(a => a.agentId === 'lobster') || agents[0];
+            targetAgent = agents.find(a => a.agentId === 'main') || agents[0];
         }
         
         if (!targetAgent) {
@@ -472,55 +729,19 @@ async function initApp() {
             return;
         }
 
-        const msgId = Date.now();
-        messagesModule.addMessage({
-            id: msgId,
-            sender: 'user',
-            text,
-            timestamp: msgId,
-            isUser: true,
-            status: 'sending'
-        });
-
-        const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
-        
-        const sent = app.send({
-            type: 'req',
-            id,
-            method: 'agent',
-            params: {
-                agentId: targetAgent.agentId,
-                sessionKey: `agent:${targetAgent.agentId}:${MAIN_KEY}`,
-                message: text,
-                idempotencyKey: id
-            }
-        });
-
-        if (sent) {
-            const messages = stateManager.getState('messages') || [];
-            const msgIndex = messages.findIndex(m => m.id === msgId);
-            if (msgIndex >= 0) {
-                messages[msgIndex].status = 'sent';
-                stateManager.setState('messages', [...messages]);
-            }
-            stateManager.setAgentBusy(targetAgent.agentId, true);
-            sidebarModule.render();
-        } else {
-            const messages = stateManager.getState('messages') || [];
-            const msgIndex = messages.findIndex(m => m.id === msgId);
-            if (msgIndex >= 0) {
-                messages[msgIndex].status = 'failed';
-                stateManager.setState('messages', [...messages]);
-            }
-        }
+        eventBus.emit(EventTypes.MESSAGE_SENT, { text, agentId: targetAgent.agentId });
     });
 
-    eventBus.on('toast:show', ({ message, type = 'info' }) => {
-        showToast(message, type);
+    eventBus.on('toast:show', ({ message, type = 'info', duration = 2000 }) => {
+        showToast(message, type, duration);
+    });
+    eventBus.on(EventTypes.UI_TOAST, ({ message, type = 'info', duration = 2000 }) => {
+        showToast(message, type, duration);
     });
 
-    function showToast(message, type = 'info') {
+    function showToast(message, type = 'info', duration = 2000) {
         const container = document.getElementById('toast-container');
+        if (!container || !message) return;
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
         toast.textContent = message;
@@ -529,73 +750,233 @@ async function initApp() {
         setTimeout(() => {
             toast.classList.add('fade-out');
             setTimeout(() => toast.remove(), 300);
-        }, 2000);
+        }, duration);
     }
 
-    app.init();
+    app.init().then(() => {
+        const activeAuthToken = app.authToken || AUTH_TOKEN || '';
+        persistGatewayToken(activeAuthToken);
+        apiService.setAuthToken(activeAuthToken);
+    }).catch((e) => {
+        console.error('[Main] App init failed:', e);
+    });
 
-    // 全局点击空白关闭弹窗（只有点击面板外部才关闭）
-    document.addEventListener('click', (e) => {
-        // 关闭筛选面板
+    const clickHitsAny = (target, elements = []) => elements.some((el) => el && (el === target || el.contains(target)));
+    const syncTransientBodyState = () => {
+        const searchVisible = Boolean(searchModule?.visible || document.getElementById('search-container')?.classList.contains('active'));
+        document.body.classList.toggle('search-active', searchVisible);
+    };
+
+    const closeFloatingPanelsFromOutside = (target) => {
         const filterPanel = document.getElementById('filter-panel');
-        const filterToggle = document.getElementById('filter-toggle');
-        if (filterPanel && filterPanel.classList.contains('active')) {
-            // 只有点击面板外部且不是切换按钮时才关闭
-            if (!filterPanel.contains(e.target) && e.target !== filterToggle && !filterToggle?.contains(e.target)) {
-                filterPanel.classList.remove('active');
-            }
+        const filterToggles = [document.getElementById('filter-toggle'), document.getElementById('filter-toggle-2')];
+        if ((filterModule.visible || filterPanel?.classList.contains('show') || filterPanel?.classList.contains('active'))
+            && !clickHitsAny(target, [filterPanel, ...filterToggles])) {
+            filterModule.hide();
         }
 
-        // 关闭搜索面板
-        const searchPanel = document.getElementById('search-panel');
-        const searchToggle = document.getElementById('search-toggle');
-        if (searchPanel && searchPanel.classList.contains('active')) {
-            if (!searchPanel.contains(e.target) && e.target !== searchToggle && !searchToggle?.contains(e.target)) {
-                searchPanel.classList.remove('active');
-            }
+        const searchContainer = document.getElementById('search-container');
+        const searchToggles = [document.getElementById('search-toggle'), document.getElementById('search-toggle-2')];
+        if ((searchModule.visible || searchContainer?.classList.contains('active'))
+            && !clickHitsAny(target, [searchContainer, ...searchToggles])) {
+            searchModule.close();
         }
 
-        // 关闭工作日志面板
-        const statusDashboard = document.getElementById('status-dashboard');
-        const statusToggle = document.getElementById('status-toggle');
-        if (statusDashboard && statusDashboard.classList.contains('active')) {
-            if (!statusDashboard.contains(e.target) && e.target !== statusToggle && !statusToggle?.contains(e.target)) {
-                statusDashboard.classList.remove('active');
-            }
+        const statusContainer = document.getElementById('status-dashboard');
+        const statusToggles = [document.getElementById('status-toggle'), document.getElementById('status-toggle-2')];
+        if ((statusDashboard.visible || statusContainer?.classList.contains('active') || statusContainer?.classList.contains('visible'))
+            && !clickHitsAny(target, [statusContainer, ...statusToggles])) {
+            statusDashboard.hide();
         }
 
-        // 关闭性能监控面板
-        const metricsDashboard = document.getElementById('metrics-dashboard');
-        const metricsToggle = document.getElementById('metrics-toggle');
-        if (metricsDashboard && metricsDashboard.classList.contains('active')) {
-            if (!metricsDashboard.contains(e.target) && e.target !== metricsToggle && !metricsToggle?.contains(e.target)) {
-                metricsDashboard.classList.remove('active');
-            }
+        const metricsContainer = document.getElementById('metrics-dashboard');
+        const metricsToggles = [document.getElementById('metrics-toggle'), document.getElementById('metrics-toggle-2')];
+        if ((metricsDashboard.isVisible || metricsContainer?.classList.contains('active') || metricsContainer?.classList.contains('visible'))
+            && !clickHitsAny(target, [metricsContainer, ...metricsToggles])) {
+            metricsDashboard.hide();
         }
 
-        // 关闭邮件监控面板
-        const emailMonitorDashboard = document.getElementById('email-monitor-dashboard');
-        const emailMonitorToggle = document.getElementById('email-monitor-toggle');
-        if (emailMonitorDashboard && emailMonitorDashboard.classList.contains('active')) {
-            if (!emailMonitorDashboard.contains(e.target) && e.target !== emailMonitorToggle && !emailMonitorToggle?.contains(e.target)) {
-                emailMonitorDashboard.classList.remove('active');
-            }
+        const emailContainer = document.getElementById('email-monitor-dashboard');
+        const emailToggles = [document.getElementById('email-monitor-toggle'), document.getElementById('email-monitor-toggle-2')];
+        if ((emailMonitorDashboard.visible || emailContainer?.classList.contains('active') || emailContainer?.classList.contains('visible'))
+            && !clickHitsAny(target, [emailContainer, ...emailToggles])) {
+            emailMonitorDashboard.hide();
         }
 
-        // 关闭 @提及菜单
         const mentionMenu = document.getElementById('mention-menu');
         const chatInput = document.getElementById('chat-input');
-        if (mentionMenu && mentionMenu.style.display !== 'none') {
-            if (!mentionMenu.contains(e.target) && e.target !== chatInput) {
-                mentionMenu.style.display = 'none';
+        if (mentionMenu && mentionMenu.style.display !== 'none' && !clickHitsAny(target, [mentionMenu, chatInput])) {
+            mentionMenu.style.display = 'none';
+        }
+
+        syncTransientBodyState();
+    };
+
+    const closeTopmostTransientUi = () => {
+        const headerDropdown = document.getElementById('header-dropdown');
+        if (headerDropdown?.classList.contains('show')) {
+            headerDropdown.classList.remove('show');
+            return true;
+        }
+
+        const noticeHistoryPanel = document.querySelector('.teamchat-notice-history-panel.active');
+        if (noticeHistoryPanel) {
+            if (typeof teamchatNotificationsModule.closeHistory === 'function') {
+                teamchatNotificationsModule.closeHistory();
+            } else {
+                noticeHistoryPanel.classList.remove('active');
             }
+            return true;
+        }
+
+        const mentionMenu = document.getElementById('mention-menu');
+        if (mentionMenu && mentionMenu.style.display !== 'none') {
+            mentionMenu.style.display = 'none';
+            return true;
+        }
+
+        const searchContainer = document.getElementById('search-container');
+        if (searchModule.visible || searchContainer?.classList.contains('active')) {
+            searchModule.close();
+            syncTransientBodyState();
+            return true;
+        }
+
+        const filterPanel = document.getElementById('filter-panel');
+        if (filterModule.visible || filterPanel?.classList.contains('show') || filterPanel?.classList.contains('active')) {
+            filterModule.hide();
+            return true;
+        }
+
+        const emailContainer = document.getElementById('email-monitor-dashboard');
+        if (emailMonitorDashboard.visible || emailContainer?.classList.contains('active') || emailContainer?.classList.contains('visible')) {
+            emailMonitorDashboard.hide();
+            return true;
+        }
+
+        const metricsContainer = document.getElementById('metrics-dashboard');
+        if (metricsDashboard.isVisible || metricsContainer?.classList.contains('active') || metricsContainer?.classList.contains('visible')) {
+            metricsDashboard.hide();
+            return true;
+        }
+
+        const statusContainer = document.getElementById('status-dashboard');
+        if (statusDashboard.visible || statusContainer?.classList.contains('active') || statusContainer?.classList.contains('visible')) {
+            statusDashboard.hide();
+            return true;
+        }
+
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+        if (sidebar?.classList.contains('active')) {
+            sidebar.classList.remove('active');
+            sidebarOverlay?.classList.remove('active');
+            document.body.style.overflow = '';
+            return true;
+        }
+
+        return false;
+    };
+
+    window.TeamChatHandleNativeBack = () => {
+        const handled = closeTopmostTransientUi();
+        if (handled) {
+            syncTransientBodyState();
+        }
+        return handled;
+    };
+
+    // 全局点击空白关闭浮层，必须走模块自己的 hide/close 逻辑，避免 visible 状态与 DOM 类名脱节
+    document.addEventListener('click', (e) => {
+        const target = e.target instanceof Node ? e.target : null;
+        if (!target) return;
+        closeFloatingPanelsFromOutside(target);
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        closeTopmostTransientUi();
+        syncTransientBodyState();
+    });
+
+    window.addEventListener('focus', syncTransientBodyState);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            syncTransientBodyState();
         }
     });
+    syncTransientBodyState();
+
+    // 全局文件链接点击处理函数
+    window.handleFileLinkClick = async function(filePath, appName = 'Finder', shortcut = 'Cmd+Shift+G') {
+        const resolvedPath = normalizeLocalPath(filePath);
+        const isLocal = ['localhost', '127.0.0.1', ''].includes(window.location.hostname);
+
+        if (!resolvedPath) {
+            eventBus.emit('toast:show', {
+                message: '无法解析文件路径',
+                type: 'error'
+            });
+            return;
+        }
+
+        if (!isLocal) {
+            try {
+                await copyLocalPath(resolvedPath, appName, shortcut);
+            } catch (err) {
+                console.error('[FileLink] Remote copy failed:', err);
+                eventBus.emit('toast:show', {
+                    message: '复制失败，请稍后重试',
+                    type: 'error'
+                });
+            }
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/open-local-file', {
+                method: 'POST',
+                headers: getAuthHeaders({
+                    'Content-Type': 'application/json'
+                }),
+                body: JSON.stringify({
+                    path: resolvedPath,
+                    reveal: true
+                })
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok || !data.ok) {
+                throw new Error(data.error || 'open_failed');
+            }
+
+            eventBus.emit('toast:show', {
+                message: `已在${appName}中定位文件`,
+                type: 'success',
+                duration: 2500
+            });
+        } catch (err) {
+            console.warn('[FileLink] Open local file failed, fallback to copy:', err);
+            try {
+                await copyLocalPath(resolvedPath, appName, shortcut, `无法直接打开，已复制路径到剪贴板`);
+            } catch (copyError) {
+                console.error('[FileLink] Copy failed:', copyError);
+                eventBus.emit('toast:show', {
+                    message: '复制失败，请手动复制路径',
+                    type: 'error'
+                });
+            }
+        }
+    };
 
     window.teamChat = {
         app,
         stateManager,
         eventBus,
+        resolveLocalFilePath: normalizeLocalPath,
+        setActionLogExpandedDefault(expanded) {
+            localStorage.setItem('team_chat_action_log_expanded_default', expanded ? 'true' : 'false');
+        },
         modules: {
             sidebar: sidebarModule,
             messages: messagesModule,
@@ -607,8 +988,71 @@ async function initApp() {
             theme: themeModule
         }
     };
+    window.eventBus = eventBus;
+    window.messagesModule = messagesModule;
+    window.sidebarModule = sidebarModule;
+    window.inputModule = inputModule;
 
     console.log('🚀 TeamChat initialized');
+    
+    // 获取并显示版本号
+    fetch('/api/version')
+        .then(r => r.json())
+        .then(data => {
+            const versionEl = document.getElementById('version-info');
+            if (versionEl && data.version) {
+                versionEl.textContent = data.version;
+                window.__TEAMCHAT_BOOT_VERSION__ = data.version;
+            }
+        })
+        .catch(() => {});
+
+    const clearShellCaches = async () => {
+        if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations().catch(() => []);
+            await Promise.all(registrations.map((registration) => registration.update().catch(() => null)));
+        }
+        if ('caches' in window) {
+            const keys = await caches.keys().catch(() => []);
+            await Promise.all(keys
+                .filter((key) => key.startsWith('teamchat-shell-'))
+                .map((key) => caches.delete(key).catch(() => false)));
+        }
+    };
+
+    const startRemoteVersionWatcher = () => {
+        const check = async () => {
+            if (document.visibilityState === 'hidden') return;
+            const response = await fetch(`/api/version?ts=${Date.now()}`, {
+                cache: 'no-store',
+                headers: getAuthHeaders()
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            const latest = data?.version;
+            const bootVersion = window.__TEAMCHAT_BOOT_VERSION__;
+            if (!latest || !bootVersion || latest === bootVersion) return;
+            const input = document.getElementById('message-input');
+            if (input?.value?.trim()) {
+                eventBus.emit('toast:show', {
+                    message: `TeamChat ${latest} 已可用，发送完当前输入后刷新即可更新`,
+                    type: 'info',
+                    duration: 8000
+                });
+                return;
+            }
+            eventBus.emit('toast:show', {
+                message: `TeamChat ${latest} 已发布，正在自动刷新`,
+                type: 'info',
+                duration: 2500
+            });
+            await clearShellCaches();
+            window.location.reload();
+        };
+        window.setInterval(() => check().catch(() => {}), 5 * 60 * 1000);
+        window.addEventListener('focus', () => check().catch(() => {}));
+    };
+    startRemoteVersionWatcher();
     
     // 添加全局同步函数供 metrics dashboard 使用
     window.syncMessagesWithServer = async function(forceFullSync = false) {
@@ -619,19 +1063,19 @@ async function initApp() {
             const localCount = localMessages.length;
             
             const apiHost = window.location.port === '5173' ? 'http://localhost:18788' : window.location.origin;
-            const sessionToken = localStorage.getItem('team_chat_session') || '';
+            const sessionToken = getSessionToken();
             
             let serverHistory;
             let serverCount;
             
             if (forceFullSync) {
                 // 完整同步：获取最近 30 天的消息
-                let url = `${apiHost}/history?days=30`;
+                let url = `${apiHost}/history?days=30&limit=2000`;
                 if (sessionToken) url += `&session=${sessionToken}`;
                 
                 const response = await fetch(url, {
                     method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: getAuthHeaders({ 'Content-Type': 'application/json' })
                 });
                 
                 if (!response.ok) throw new Error('Failed to fetch history');
@@ -646,7 +1090,7 @@ async function initApp() {
                 
                 const response = await fetch(url, {
                     method: 'GET',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: getAuthHeaders({ 'Content-Type': 'application/json' })
                 });
                 
                 if (!response.ok) throw new Error('Failed to fetch new messages');
@@ -674,10 +1118,7 @@ async function initApp() {
             
             // 更新本地消息
             if (serverCount > 0) {
-                stateManager.setState('messages', serverHistory);
-                if (window.messagesModule && window.messagesModule.render) {
-                    window.messagesModule.render();
-                }
+                stateManager.loadHistory(serverHistory);
                 
                 // 更新最后消息时间戳
                 const latestTimestamp = Math.max(...serverHistory.map(m => m.timestamp || 0));

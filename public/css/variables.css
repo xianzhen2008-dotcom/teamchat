@@ -1,102 +1,157 @@
 /**
- * TeamChat Variables - 赛博科技风格
+ * TeamChat CSS Variables
+ * 语义化设计令牌 + 多皮肤配置
  */
 
 :root {
-    /* 主色调 - 赛博青 */
-    --primary: #00d4ff;
-    --primary-dark: #00a8cc;
-    --primary-light: #5ce1ff;
-    
-    /* 强调色 */
-    --accent: #ff006e;
-    --accent-glow: rgba(255, 0, 110, 0.3);
-    --success: #00f5d4;
-    --warning: #fee440;
-    --error: #f15bb5;
-    
-    /* 背景色 */
-    --bg-primary: #0a0a0f;
-    --bg-secondary: #12121a;
-    --bg-tertiary: #1a1a25;
-    --bg-hover: rgba(0, 212, 255, 0.05);
-    --bg-active: rgba(0, 212, 255, 0.1);
-    
-    /* 文字色 */
-    --text-primary: #ffffff;
-    --text-secondary: #a0a0b0;
-    --text-muted: #606070;
-    --text-inverse: #0a0a0f;
-    
-    /* 边框 */
-    --border-color: rgba(0, 212, 255, 0.15);
-    --border-hover: rgba(0, 212, 255, 0.3);
-    --border-active: rgba(0, 212, 255, 0.5);
-    
-    /* 消息气泡 */
-    --msg-user-bg: linear-gradient(135deg, #00d4ff 0%, #00a8cc 100%);
-    --msg-agent-bg: rgba(0, 212, 255, 0.08);
-    
-    /* 阴影 */
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-    --shadow-glow: 0 0 20px rgba(0, 212, 255, 0.2);
-    --shadow-glow-strong: 0 0 30px rgba(0, 212, 255, 0.4);
-    
-    /* 字体 */
-    --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
-    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    
-    /* 间距 */
-    --space-xs: 4px;
-    --space-sm: 8px;
-    --space-md: 16px;
-    --space-lg: 24px;
-    --space-xl: 32px;
-    
-    /* 圆角 */
-    --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 16px;
-    --radius-xl: 24px;
-    
-    /* 过渡 */
-    --transition-fast: 0.15s ease;
-    --transition-normal: 0.25s ease;
-    --transition-slow: 0.4s ease;
-    
-    /* 面板 */
-    --panel-bg: rgba(18, 18, 26, 0.95);
-    --panel-border: 1px solid var(--border-color);
-    
-    /* 输入框 */
-    --input-bg: rgba(0, 0, 0, 0.3);
-    --input-border: 1px solid var(--border-color);
-    --input-focus-border: 1px solid var(--primary);
-    
-    /* 状态指示器 - 忙碌-橙，离线-灰，空闲-蓝 */
-    --status-online: #00d4ff;
-    --status-busy: #ff9500;
-    --status-offline: #606070;
-    --status-idle: #00d4ff;
-    --status-processing: #9d4edd;
-    --status-queued: #fee440;
+    color-scheme: dark;
+    --font-sans: "SF Pro Text", "SF Pro Display", "PingFang SC", "Hiragino Sans GB", "Segoe UI Variable", "Noto Sans SC", sans-serif;
+    --font-display: "SF Pro Display", "PingFang SC", "Segoe UI Variable", "Noto Sans SC", sans-serif;
+    --font-serif: "Iowan Old Style", "Palatino Linotype", "Songti SC", "Noto Serif SC", Georgia, serif;
+    --font-mono: "SF Mono", "JetBrains Mono", "Cascadia Code", "Fira Code", Monaco, Consolas, monospace;
+
+    --radius-sm: 10px;
+    --radius-md: 16px;
+    --radius-lg: 22px;
+    --radius-xl: 28px;
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.08);
+    --shadow-sm: 0 10px 30px rgba(0, 0, 0, 0.16);
+    --shadow-md: 0 18px 50px rgba(0, 0, 0, 0.22);
+    --shadow-lg: 0 30px 80px rgba(0, 0, 0, 0.28);
+
+    --transition-fast: 0.16s ease;
+    --transition-normal: 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+    --transition-slow: 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    --glass-blur: 20px;
+    --message-font-size: 15px;
+    --message-line-height: 1.72;
+    --message-max-width: 860px;
+
+    --surface-1: rgba(18, 26, 38, 0.9);
+    --surface-2: rgba(20, 31, 46, 0.82);
+    --surface-3: rgba(28, 41, 61, 0.9);
+    --surface-glass: rgba(12, 19, 30, 0.62);
+    --surface-glass-strong: rgba(12, 19, 30, 0.78);
+
+    --accent: #7dd3fc;
+    --accent-strong: #38bdf8;
+    --accent-soft: rgba(125, 211, 252, 0.14);
+    --accent-ring: rgba(56, 189, 248, 0.28);
+
+    --bubble-agent-bg: var(--surface-1);
+    --bubble-agent-border: rgba(148, 163, 184, 0.18);
+    --bubble-user-bg: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 46%, #0ea5e9 100%);
+    --bubble-user-color: #04131c;
+    --inline-code-bg: rgba(125, 211, 252, 0.12);
+    --inline-code-border: rgba(125, 211, 252, 0.18);
+    --table-head-bg: rgba(125, 211, 252, 0.12);
+    --table-cell-bg: rgba(255, 255, 255, 0.02);
+    --table-border: rgba(148, 163, 184, 0.14);
+
+    --app-glow-1: rgba(34, 211, 238, 0.18);
+    --app-glow-2: rgba(59, 130, 246, 0.14);
+    --app-grid-opacity: 0.08;
+    --app-grid-size: 36px;
+
+    --bg-primary: #07121d;
+    --bg-secondary: #0a1726;
+    --bg-tertiary: #122238;
+    --panel-dark: var(--surface-glass);
+    --panel-darker: var(--surface-glass-strong);
+    --text-main: #ebf3ff;
+    --text-primary: #ebf3ff;
+    --text-secondary: #adc0d9;
+    --text-muted: #7e93ad;
+    --border-color: rgba(148, 163, 184, 0.16);
+    --input-bg: rgba(8, 16, 28, 0.72);
+    --msg-agent-bg: var(--bubble-agent-bg);
+    --msg-user-bg: var(--bubble-user-bg);
+    --cyber-red: #fb7185;
+    --cyber-blue: var(--accent);
+    --cyber-purple: #c084fc;
+    --cyber-green: #34d399;
 }
 
-/* 亮色主题 */
-[data-theme="light"] {
-    --bg-primary: #f5f5f7;
-    --bg-secondary: #ffffff;
-    --bg-tertiary: #e8e8ed;
-    
-    --text-primary: #1a1a2e;
-    --text-secondary: #4a4a5a;
-    --text-muted: #8a8a9a;
-    
-    --border-color: rgba(0, 212, 255, 0.2);
-    --msg-agent-bg: rgba(0, 212, 255, 0.05);
-    
-    --panel-bg: rgba(255, 255, 255, 0.95);
-    --input-bg: rgba(0, 0, 0, 0.05);
+[data-skin="glass"] {
+    --accent: #7dd3fc;
+    --accent-strong: #38bdf8;
+    --accent-soft: rgba(125, 211, 252, 0.14);
+    --accent-ring: rgba(56, 189, 248, 0.28);
+    --surface-glass: rgba(13, 20, 31, 0.58);
+    --surface-glass-strong: rgba(13, 20, 31, 0.74);
+    --surface-1: rgba(16, 25, 38, 0.84);
+    --surface-2: rgba(22, 34, 49, 0.76);
+    --surface-3: rgba(28, 43, 64, 0.88);
+    --bubble-user-bg: linear-gradient(135deg, #a5f3fc 0%, #67e8f9 38%, #38bdf8 100%);
+    --bubble-user-color: #04131c;
+    --inline-code-bg: rgba(125, 211, 252, 0.12);
+    --inline-code-border: rgba(125, 211, 252, 0.18);
+    --table-head-bg: rgba(125, 211, 252, 0.12);
+    --app-glow-1: rgba(45, 212, 191, 0.18);
+    --app-glow-2: rgba(59, 130, 246, 0.14);
+}
+
+[data-skin="fresh"] {
+    --accent: #59c3a7;
+    --accent-strong: #2da58c;
+    --accent-soft: rgba(89, 195, 167, 0.14);
+    --accent-ring: rgba(45, 165, 140, 0.22);
+    --surface-glass: rgba(255, 255, 255, 0.76);
+    --surface-glass-strong: rgba(248, 252, 249, 0.9);
+    --surface-1: rgba(255, 255, 255, 0.94);
+    --surface-2: rgba(247, 251, 248, 0.96);
+    --surface-3: rgba(239, 248, 244, 0.98);
+    --bubble-user-bg: linear-gradient(135deg, #b9f3df 0%, #8ee8cc 44%, #61d9b7 100%);
+    --bubble-user-color: #11342e;
+    --bubble-agent-bg: rgba(255, 255, 255, 0.96);
+    --bubble-agent-border: rgba(107, 143, 130, 0.16);
+    --inline-code-bg: rgba(89, 195, 167, 0.12);
+    --inline-code-border: rgba(89, 195, 167, 0.18);
+    --table-head-bg: rgba(89, 195, 167, 0.12);
+    --table-cell-bg: rgba(255, 255, 255, 0.82);
+    --table-border: rgba(111, 139, 131, 0.16);
+    --app-glow-1: rgba(89, 195, 167, 0.12);
+    --app-glow-2: rgba(148, 216, 199, 0.14);
+    --app-grid-opacity: 0.04;
+}
+
+[data-skin="cyber"] {
+    --accent: #22d3ee;
+    --accent-strong: #00f5d4;
+    --accent-soft: rgba(34, 211, 238, 0.12);
+    --accent-ring: rgba(34, 211, 238, 0.26);
+    --surface-glass: rgba(5, 10, 20, 0.72);
+    --surface-glass-strong: rgba(5, 10, 20, 0.86);
+    --surface-1: rgba(8, 14, 27, 0.96);
+    --surface-2: rgba(10, 19, 35, 0.86);
+    --surface-3: rgba(14, 28, 52, 0.9);
+    --bubble-user-bg: linear-gradient(135deg, #22d3ee 0%, #00f5d4 40%, #38bdf8 100%);
+    --bubble-user-color: #021014;
+    --inline-code-bg: rgba(34, 211, 238, 0.14);
+    --inline-code-border: rgba(0, 245, 212, 0.24);
+    --table-head-bg: rgba(34, 211, 238, 0.13);
+    --app-glow-1: rgba(34, 211, 238, 0.24);
+    --app-glow-2: rgba(192, 132, 252, 0.16);
+    --app-grid-opacity: 0.12;
+}
+
+[data-skin="editorial"] {
+    --accent: #f59e0b;
+    --accent-strong: #fb923c;
+    --accent-soft: rgba(245, 158, 11, 0.14);
+    --accent-ring: rgba(251, 146, 60, 0.24);
+    --surface-glass: rgba(28, 21, 14, 0.58);
+    --surface-glass-strong: rgba(28, 21, 14, 0.74);
+    --surface-1: rgba(36, 28, 21, 0.88);
+    --surface-2: rgba(46, 35, 25, 0.78);
+    --surface-3: rgba(59, 45, 31, 0.88);
+    --bubble-user-bg: linear-gradient(135deg, #fdba74 0%, #fb923c 48%, #f97316 100%);
+    --bubble-user-color: #1b1208;
+    --inline-code-bg: rgba(245, 158, 11, 0.12);
+    --inline-code-border: rgba(245, 158, 11, 0.18);
+    --table-head-bg: rgba(245, 158, 11, 0.12);
+    --app-glow-1: rgba(245, 158, 11, 0.16);
+    --app-glow-2: rgba(236, 72, 153, 0.12);
 }

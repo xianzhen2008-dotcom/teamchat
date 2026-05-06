@@ -9,6 +9,15 @@ import { avatarService } from '../../services/avatar.js';
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 const MAX_LOGS_PER_AGENT = 200;
+const SESSION_KEY = 'team_chat_session';
+
+function getSessionToken() {
+    try {
+        return window.__INITIAL_SESSION__ || localStorage.getItem(SESSION_KEY) || '';
+    } catch {
+        return '';
+    }
+}
 
 export class StatusDashboard {
     constructor() {
@@ -19,6 +28,8 @@ export class StatusDashboard {
         this.selectedAgentId = null;
         this.initialized = false;
         this.sseConnection = null;
+        this.sseConnected = false;
+        this.visibilityHandler = null;
     }
 
     init(options = {}) {
@@ -41,8 +52,14 @@ export class StatusDashboard {
         eventBus.on('agent:complete', this.onComplete.bind(this));
         eventBus.on('agent:error', this.onError.bind(this));
         
-        // 连接 SSE 日志流
-        this.connectSSE();
+        this.visibilityHandler = () => {
+            if (document.hidden) {
+                this.disconnectSSE();
+            } else if (this.visible) {
+                this.connectSSE();
+            }
+        };
+        document.addEventListener('visibilitychange', this.visibilityHandler);
 
         return this;
     }
@@ -86,11 +103,21 @@ export class StatusDashboard {
     }
     
     connectSSE() {
+        if (!this.visible) return;
+        if (this.sseConnection && this.sseConnected) return;
+
         const apiHost = window.location.port === '5173' ? 'http://localhost:18788' : window.location.origin;
-        const sseUrl = `${apiHost}/api/agent-logs/stream`;
+        const sessionToken = getSessionToken();
+        const sseUrl = sessionToken
+            ? `${apiHost}/api/agent-logs/stream?session=${encodeURIComponent(sessionToken)}`
+            : `${apiHost}/api/agent-logs/stream`;
         
         try {
+            if (this.sseConnection) {
+                this.sseConnection.close();
+            }
             this.sseConnection = new EventSource(sseUrl);
+            this.sseConnected = false;
             
             this.sseConnection.onmessage = (event) => {
                 try {
@@ -116,16 +143,31 @@ export class StatusDashboard {
                     // Ignore parse errors
                 }
             };
-            
-            this.sseConnection.onerror = () => {
-                console.log('[Dashboard] SSE connection error, will retry');
-                // EventSource 会自动重连
+
+            this.sseConnection.onopen = () => {
+                this.sseConnected = true;
+                console.log('[Dashboard] SSE connected');
             };
             
-            console.log('[Dashboard] SSE connected');
+            this.sseConnection.onerror = () => {
+                this.sseConnected = false;
+                if (!this.visible || document.hidden) {
+                    this.disconnectSSE();
+                    return;
+                }
+                console.log('[Dashboard] SSE connection error, waiting for browser retry');
+            };
         } catch (e) {
             console.error('[Dashboard] SSE connection failed:', e);
         }
+    }
+
+    disconnectSSE() {
+        if (this.sseConnection) {
+            this.sseConnection.close();
+            this.sseConnection = null;
+        }
+        this.sseConnected = false;
     }
     
     handleBroadcast(broadcastMsg) {
@@ -274,6 +316,17 @@ export class StatusDashboard {
         
         this.agentLogs.set(agentId, validLogs);
         this.agentLastActive.set(agentId, log.time);
+
+        eventBus.emit('agent:trace', {
+            agentId,
+            trace: {
+                type: log.type,
+                title: log.title,
+                content: log.content,
+                status: log.type === 'error' ? 'error' : (log.type === 'tool_call' ? 'running' : 'success'),
+                time: log.time
+            }
+        });
         
         if (this.visible) {
             this.render();
@@ -298,6 +351,7 @@ export class StatusDashboard {
             this.container.classList.add('active');
         }
         this.visible = true;
+        this.connectSSE();
         this.render();
     }
 
@@ -306,6 +360,7 @@ export class StatusDashboard {
             this.container.classList.remove('active');
         }
         this.visible = false;
+        this.disconnectSSE();
     }
 
     render() {
@@ -421,11 +476,11 @@ export class StatusDashboard {
         this.hide();
         this.agentLogs.clear();
         this.agentLastActive.clear();
-        if (this.sseConnection) {
-            this.sseConnection.close();
-            this.sseConnection = null;
+        this.disconnectSSE();
+        if (this.visibilityHandler) {
+            document.removeEventListener('visibilitychange', this.visibilityHandler);
+            this.visibilityHandler = null;
         }
-        this.sseConnected = false;
     }
 }
 

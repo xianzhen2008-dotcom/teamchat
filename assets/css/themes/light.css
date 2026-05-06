@@ -1,21 +1,42 @@
 /**
  * TeamChat Light Theme
- * 亮色主题变量定义
+ * 亮色模式基础色板
  */
 
 [data-theme="light"] {
-    --bg-dark: #ffffff;
-    --panel-dark: #f6f8fa;
-    --text-main: #24292f;
-    --border-color: #d0d7de;
-    --input-bg: #ffffff;
-    --msg-agent-bg: #f6f8fa;
-    --msg-user-bg: #0969da;
-    --cyber-red: #cf222e;
-    --cyber-blue: #0969da;
-    --cyber-purple: #8250df;
-    --cyber-green: #1a7f37;
-    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-    --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-    --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+    color-scheme: light;
+    --bg-primary: #f4faf7;
+    --bg-secondary: #fbfefd;
+    --bg-tertiary: #e8f4ee;
+
+    --surface-1: rgba(255, 255, 255, 0.84);
+    --surface-2: rgba(247, 250, 253, 0.92);
+    --surface-3: rgba(239, 245, 251, 0.95);
+    --surface-glass: rgba(255, 255, 255, 0.72);
+    --surface-glass-strong: rgba(255, 255, 255, 0.88);
+
+    --text-primary: #183329;
+    --text-secondary: #536d64;
+    --text-muted: #80948c;
+
+    --border-color: rgba(96, 121, 112, 0.14);
+    --input-bg: rgba(255, 255, 255, 0.86);
+    --bubble-agent-bg: rgba(255, 255, 255, 0.92);
+    --bubble-agent-border: rgba(123, 149, 140, 0.2);
+    --bubble-user-color: #103028;
+
+    --table-cell-bg: rgba(255, 255, 255, 0.72);
+    --app-glow-1: rgba(89, 195, 167, 0.1);
+    --app-glow-2: rgba(166, 218, 203, 0.12);
+
+    --bg-dark: var(--bg-primary);
+    --panel-dark: var(--surface-glass);
+    --panel-darker: var(--surface-glass-strong);
+    --text-main: var(--text-primary);
+    --msg-agent-bg: var(--bubble-agent-bg);
+    --msg-user-bg: var(--bubble-user-bg);
+    --cyber-blue: var(--accent-strong);
+    --cyber-green: #2da58c;
+    --cyber-red: #d35f6b;
+    --cyber-purple: #8f84cf;
 }

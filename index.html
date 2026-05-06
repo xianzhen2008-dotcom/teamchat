@@ -5,24 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>TeamChat - AI Agent 协作平台</title>
+    <meta name="theme-color" content="#eef8f3">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="description" content="TeamChat is an open-source multi-agent team chat workspace with realtime messaging, action logs, notifications, and mobile-ready layouts.">
+    <title>TeamChat - Multi-Agent Workspace</title>
+    <link rel="icon" href="/icons/teamchat-192.png" type="image/png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/icons/teamchat-192.png">
     
-    <link rel="stylesheet" href="/css/variables.css?v=126">
-    <link rel="stylesheet" href="/css/base.css?v=126">
-    <link rel="stylesheet" href="/css/components.css?v=126">
-    <link rel="stylesheet" href="/css/layout.css?v=126">
-    <link rel="stylesheet" href="/css/mobile.css?v=126">
-    <link rel="stylesheet" href="/css/themes/dark.css?v=126" id="theme-dark">
-    <link rel="stylesheet" href="/css/themes/light.css?v=126" id="theme-light" disabled>
+    <link rel="stylesheet" href="/css/variables.css?v=278">
+    <link rel="stylesheet" href="/css/base.css?v=278">
+    <link rel="stylesheet" href="/css/components.css?v=278">
+    <link rel="stylesheet" href="/css/layout.css?v=278">
+    <link rel="stylesheet" href="/css/mobile.css?v=278">
+    <link rel="stylesheet" href="/css/skins.css?v=278">
 
-    <!-- 预加载压缩后的头像，加速首屏渲染 -->
-    <link rel="preload" href="/images/agent-default.png" as="image">
-    <link rel="preload" href="/images/agent-default.png" as="image">
-    <link rel="preload" href="/images/agent-default.png" as="image">
-    <link rel="preload" href="/images/agent-default.png" as="image">
-    <link rel="preload" href="/images/compressed/小文2_compressed.jpg" as="image">
+    <link rel="preload" href="/assets/avatars/agent-main.svg" as="image">
 </head>
-<body data-theme="dark">
+<body data-skin="fresh">
     <div class="app-container">
         <aside class="sidebar" id="sidebar">
             <header class="sidebar-header">
@@ -38,7 +40,7 @@
                 <div class="header-title">
                     <span id="current-agent-name">TeamChat</span>
                     <span class="connection-status" id="connection-status"></span>
-                    <span class="version-info" id="version-info">v1.2.0</span>
+                    <span class="version-info" id="version-info">v278</span>
                 </div>
                 <div class="header-actions">
                     <button class="header-btn desktop-only" id="search-toggle" title="搜索">🔍</button>
@@ -74,18 +76,33 @@
                             <span>锁定滚动</span>
                         </button>
                         <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="/muse-app/index.html" target="_blank">
-                            <span class="dropdown-icon">🧠</span>
-                            <span>Muse System</span>
-                        </a>
-                        <button class="dropdown-item" id="theme-toggle-2">
-                            <span class="dropdown-icon">🌙</span>
-                            <span>切换主题</span>
+                        <div class="dropdown-section-title">外观皮肤</div>
+                        <button class="dropdown-item" id="skin-toggle-2">
+                            <span class="dropdown-icon">🪄</span>
+                            <span>轮换皮肤</span>
+                            <span class="dropdown-meta" id="skin-current-badge">小清新</span>
                         </button>
-                        <a class="dropdown-item" href="/team_chat.html" target="_blank">
-                            <span class="dropdown-icon">📜</span>
-                            <span>旧版界面</span>
-                        </a>
+                        <div class="dropdown-section-title">风格皮肤</div>
+                        <button class="dropdown-item skin-option" data-skin="fresh" aria-pressed="true">
+                            <span class="dropdown-icon">❋</span>
+                            <span>小清新</span>
+                            <span class="dropdown-meta">Fresh</span>
+                        </button>
+                        <button class="dropdown-item skin-option" data-skin="glass" aria-pressed="false">
+                            <span class="dropdown-icon">◇</span>
+                            <span>黑色玻璃</span>
+                            <span class="dropdown-meta">Glass</span>
+                        </button>
+                        <button class="dropdown-item skin-option" data-skin="cyber" aria-pressed="false">
+                            <span class="dropdown-icon">◈</span>
+                            <span>赛博科技</span>
+                            <span class="dropdown-meta">Cyber</span>
+                        </button>
+                        <button class="dropdown-item skin-option" data-skin="editorial" aria-pressed="false">
+                            <span class="dropdown-icon">◌</span>
+                            <span>杂志阅读</span>
+                            <span class="dropdown-meta">Editorial</span>
+                        </button>
                     </div>
                 </div>
             </header>
@@ -96,7 +113,19 @@
                 <span class="search-close">✕</span>
             </div>
 
-            <div class="messages-view" id="messages-view"></div>
+            <section class="teamchat-notice-strip" id="teamchat-notice-strip" aria-label="TeamChat 通知"></section>
+
+            <div class="messages-view" id="messages-view">
+                <div class="messages-loading-state">
+                    <div class="messages-loading-pulse"></div>
+                    <div class="messages-loading-lines">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <div class="messages-loading-text">正在加载历史消息...</div>
+                </div>
+            </div>
 
             <div class="input-area" id="input-area">
                 <div class="file-preview" id="file-preview"></div>
@@ -118,6 +147,7 @@
                 <button class="filter-quick-btn" data-filter="all">全部</button>
                 <button class="filter-quick-btn" data-filter="dev">开发组</button>
             </div>
+            <div class="filter-options" id="filter-options"></div>
             <div class="filter-agent-grid" id="filter-agent-grid"></div>
         </div>
         <div class="filter-panel-overlay" id="filter-panel-overlay"></div>
@@ -127,6 +157,6 @@
         <div class="toast-container" id="toast-container"></div>
     </div>
 
-    <script type="module" src="/assets/js/main.js?v=126"></script>
+    <script type="module" src="./assets/js/main.js?v=278"></script>
 </body>
 </html>

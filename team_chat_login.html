@@ -2,325 +2,791 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Team Chat 登录</title>
     <style>
         :root {
             --bg-dark: #0d1117;
             --panel-dark: #161b22;
+            --panel-dark2: #1c2128;
             --text-main: #c9d1d9;
+            --text-muted: #8b949e;
             --border-color: #30363d;
+            --border-hover: #484f58;
             --cyber-green: #3fb950;
+            --cyber-green-hover: #56d364;
             --cyber-blue: #00d4ff;
+            --cyber-blue-hover: #33dfff;
+            --error-red: #f85149;
+            --warning-amber: #d29922;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --shadow: 0 8px 32px rgba(0,0,0,0.4);
+            --shadow-glow: 0 0 30px rgba(63, 185, 80, 0.15);
         }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
             background-color: var(--bg-dark);
             color: var(--text-main);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
+            padding-top: max(20px, env(safe-area-inset-top));
+            padding-right: max(20px, env(safe-area-inset-right));
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
+            padding-left: max(20px, env(safe-area-inset-left));
+            background-image:
+                radial-gradient(ellipse at 20% 80%, rgba(0, 212, 255, 0.05) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(63, 185, 80, 0.05) 0%, transparent 50%);
         }
-        
-        .login-container {
+
+        .login-wrapper {
+            width: 100%;
+            max-width: 960px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            align-items: center;
+        }
+
+        /* 左侧品牌区 */
+        .brand-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        .brand-logo {
+            width: 80px; height: 80px;
+            background: linear-gradient(135deg, var(--cyber-blue), var(--cyber-green));
+            border-radius: 22px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 40px;
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3);
+            animation: logoFloat 3s ease-in-out infinite;
+        }
+        @keyframes logoFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+        .brand-title {
+            font-size: 2.2rem; font-weight: 800; line-height: 1.2;
+            background: linear-gradient(135deg, var(--cyber-blue), var(--cyber-green));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .brand-desc { font-size: 1.05rem; color: var(--text-muted); line-height: 1.8; }
+        .brand-features { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+        .brand-feature { display: flex; align-items: center; gap: 10px; font-size: 0.95rem; color: var(--text-muted); }
+        .brand-feature-icon { font-size: 1.1rem; }
+        .brand-footer { margin-top: 20px; font-size: 0.85rem; color: #484f58; }
+
+        /* 右侧登录表单 */
+        .login-panel {
             background-color: var(--panel-dark);
             border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 40px;
-            width: 100%;
-            max-width: 400px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            border-radius: var(--radius);
+            padding: 36px;
+            box-shadow: var(--shadow), var(--shadow-glow);
+            position: relative;
+            overflow: hidden;
         }
-        
-        .login-header {
-            text-align: center;
-            margin-bottom: 30px;
+        .login-panel::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--cyber-blue), var(--cyber-green));
         }
-        
-        .login-header h1 {
-            font-size: 28px;
-            margin-bottom: 8px;
-            background: linear-gradient(135deg, var(--cyber-blue), var(--cyber-green));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+
+        /* 登录模式切换 */
+        .login-modes {
+            display: flex; gap: 8px; margin-bottom: 24px;
+            background: var(--panel-dark2); border-radius: var(--radius-sm);
+            padding: 4px;
         }
-        
-        .login-header p {
-            color: #8b949e;
-            font-size: 14px;
+        .login-mode-btn {
+            flex: 1; padding: 10px; border: none; border-radius: 8px;
+            font-size: 0.9rem; font-weight: 600; cursor: pointer;
+            transition: all 0.25s; background: transparent; color: var(--text-muted);
         }
-        
-        .form-group {
-            margin-bottom: 20px;
+        .login-mode-btn:hover { color: var(--text-main); }
+        .login-mode-btn.active {
+            background: var(--panel-dark); color: var(--cyber-green);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 14px;
-            color: #8b949e;
+
+        .login-header-text {
+            font-size: 1.3rem; font-weight: 700; color: var(--text-main);
+            margin-bottom: 6px;
         }
-        
-        .form-group input {
-            width: 100%;
-            padding: 12px 16px;
-            background-color: var(--bg-dark);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            color: var(--text-main);
-            font-size: 16px;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        
-        .form-group input:focus {
-            border-color: var(--cyber-blue);
-        }
-        
-        .form-group input::placeholder {
-            color: #484f58;
-        }
-        
-        .login-btn {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, var(--cyber-green), #238636);
-            border: none;
-            border-radius: 8px;
-            color: white;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        
-        .login-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(63, 185, 80, 0.3);
-        }
-        
-        .login-btn:active {
-            transform: translateY(0);
-        }
-        
-        .login-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
-        .send-password-btn {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #1f6feb, #1158c7);
-            border: none;
-            border-radius: 8px;
-            color: white;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            margin-top: 12px;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        
-        .send-password-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(31, 111, 235, 0.3);
-        }
-        
-        .send-password-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
+        .login-subtitle { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 24px; }
+
+        /* 错误提示 */
         .error-message {
-            background-color: rgba(248, 81, 73, 0.1);
+            background: rgba(248, 81, 73, 0.1);
             border: 1px solid rgba(248, 81, 73, 0.3);
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 20px;
-            color: #f85149;
-            font-size: 14px;
-            display: none;
+            border-radius: var(--radius-sm);
+            padding: 12px 14px; margin-bottom: 18px;
+            color: var(--error-red); font-size: 0.9rem;
+            display: flex; align-items: center; gap: 8px;
+            transition: all 0.3s; max-height: 0; overflow: hidden; opacity: 0; padding: 0 14px;
         }
-        
-        .error-message.show {
-            display: block;
+        .error-message.show { max-height: 60px; opacity: 1; padding: 12px 14px; }
+
+        /* 表单 */
+        .form-group { margin-bottom: 18px; }
+        .form-label {
+            display: block; margin-bottom: 8px; font-size: 0.9rem;
+            color: var(--text-muted); font-weight: 500;
         }
-        
-        .local-hint {
-            text-align: center;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border-color);
-            font-size: 13px;
-            color: #8b949e;
+        .input-wrapper { position: relative; }
+        .form-input {
+            width: 100%; padding: 13px 44px 13px 44px;
+            background-color: var(--panel-dark2);
+            border: 1.5px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-main);
+            font-size: 1rem; outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
-        
-        .local-hint a {
-            color: var(--cyber-blue);
-            text-decoration: none;
+        .form-input:focus {
+            border-color: var(--cyber-blue);
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
         }
-        
-        .local-hint a:hover {
-            text-decoration: underline;
+        .form-input.error-field {
+            border-color: var(--error-red);
+            box-shadow: 0 0 0 3px rgba(248, 81, 73, 0.1);
         }
-        
-        .logo {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 20px;
-            background: linear-gradient(135deg, var(--cyber-blue), var(--cyber-green));
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 40px;
+        .form-input::placeholder { color: #484f58; }
+        .input-icon {
+            position: absolute; left: 14px; top: 50%;
+            transform: translateY(-50%); font-size: 1.1rem;
+            pointer-events: none; color: var(--text-muted);
         }
+        .input-eye {
+            position: absolute; right: 14px; top: 50%;
+            transform: translateY(-50%); font-size: 1.1rem;
+            cursor: pointer; color: var(--text-muted);
+            transition: color 0.2s; padding: 4px;
+        }
+        .input-eye:hover { color: var(--cyber-blue); }
+
+        /* 密码强度 */
+        .password-strength {
+            display: flex; gap: 4px; margin-top: 8px;
+        }
+        .strength-bar {
+            flex: 1; height: 4px; border-radius: 2px;
+            background: var(--border-color); transition: background 0.3s;
+        }
+        .strength-bar.active.weak { background: var(--error-red); }
+        .strength-bar.active.medium { background: var(--warning-amber); }
+        .strength-bar.active.strong { background: var(--cyber-green); }
+        .strength-label { font-size: 0.8rem; margin-top: 4px; }
+        .strength-label.weak { color: var(--error-red); }
+        .strength-label.medium { color: var(--warning-amber); }
+        .strength-label.strong { color: var(--cyber-green); }
+
+        /* 选项行 */
+        .form-options {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 20px; font-size: 0.9rem;
+        }
+        .checkbox-label {
+            display: flex; align-items: center; gap: 8px; cursor: pointer;
+            color: var(--text-muted); user-select: none;
+        }
+        .checkbox-label input[type="checkbox"] {
+            width: 16px; height: 16px; cursor: pointer;
+            accent-color: var(--cyber-green);
+        }
+        .forgot-link {
+            color: var(--cyber-blue); text-decoration: none; cursor: pointer;
+        }
+        .forgot-link:hover { text-decoration: underline; }
+
+        /* 登录按钮 */
+        .login-btn {
+            width: 100%; padding: 14px;
+            background: linear-gradient(135deg, var(--cyber-green), #238636);
+            border: none; border-radius: var(--radius-sm);
+            color: white; font-size: 1rem; font-weight: 700;
+            cursor: pointer; transition: all 0.25s;
+            position: relative; overflow: hidden;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .login-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(63, 185, 80, 0.35);
+        }
+        .login-btn:active:not(:disabled) { transform: translateY(0); }
+        .login-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+        .login-btn .btn-spinner {
+            width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,0.3);
+            border-top-color: white; border-radius: 50%;
+            animation: spin 0.8s linear infinite; display: none;
+        }
+        .login-btn.loading .btn-spinner { display: block; }
+        .login-btn.loading .btn-text { display: none; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Optional QR login shell, disabled unless an adapter implements it */
+        .qr-section { text-align: center; }
+        .qr-box {
+            width: 200px; height: 200px; margin: 0 auto 16px;
+            background: var(--panel-dark2); border-radius: var(--radius-sm);
+            border: 1.5px solid var(--border-color);
+            display: flex; align-items: center; justify-content: center;
+            position: relative; overflow: hidden;
+        }
+        .qr-box img, .qr-box canvas { max-width: 180px; max-height: 180px; }
+        .qr-expired {
+            position: absolute; inset: 0; background: rgba(13,17,23,0.9);
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 10px; font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        .qr-expired button {
+            padding: 8px 20px; border-radius: 8px; border: none;
+            background: var(--cyber-blue); color: white; font-weight: 600;
+            cursor: pointer; font-size: 0.85rem;
+        }
+        .qr-tip { font-size: 0.85rem; color: var(--text-muted); }
+        .qr-tip strong { color: var(--cyber-green); }
+
+        /* 分割线 */
+        .divider {
+            display: flex; align-items: center; gap: 14px;
+            margin: 20px 0; color: var(--text-muted); font-size: 0.85rem;
+        }
+        .divider::before, .divider::after {
+            content: ''; flex: 1; height: 1px; background: var(--border-color);
+        }
+
+        /* SSO按钮 */
+        .sso-btn {
+            width: 100%; padding: 12px;
+            background: var(--panel-dark2);
+            border: 1.5px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-main); font-size: 0.95rem; font-weight: 600;
+            cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .sso-btn:hover { border-color: var(--cyber-blue); color: var(--cyber-blue); }
+
+        /* 底部 */
+        .login-footer {
+            text-align: center; margin-top: 20px;
+            font-size: 0.85rem; color: var(--text-muted);
+        }
+        .login-footer a { color: var(--cyber-blue); text-decoration: none; }
+        .login-footer a:hover { text-decoration: underline; }
+
+        /* 成功动画 */
+        .success-overlay {
+            position: fixed; inset: 0;
+            background: rgba(13,17,23,0.95);
+            display: none; align-items: center; justify-content: center;
+            z-index: 9999; flex-direction: column; gap: 16px;
+        }
+        .success-overlay.show { display: flex; }
+        .success-checkmark {
+            width: 80px; height: 80px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--cyber-green), #238636);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 40px; animation: successPop 0.5s ease;
+        }
+        @keyframes successPop {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .success-text { font-size: 1.2rem; font-weight: 700; color: var(--text-main); }
+        .success-sub { font-size: 0.9rem; color: var(--text-muted); }
+
+        /* 抖动动画 */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            15%, 45%, 75% { transform: translateX(-6px); }
+            30%, 60%, 90% { transform: translateX(6px); }
+        }
+        .shake { animation: shake 0.5s ease; }
+
+        /* 响应式 */
+        @media (max-width: 700px) {
+            body {
+                align-items: flex-start;
+            }
+            .login-wrapper {
+                grid-template-columns: 1fr;
+                max-width: 440px;
+                width: 100%;
+                padding-top: 12px;
+            }
+            .brand-panel { display: none; }
+            .login-panel {
+                padding: 24px 18px;
+                border-radius: 18px;
+            }
+            .form-options {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            .login-header-text {
+                font-size: 1.18rem;
+            }
+            .login-subtitle,
+            .checkbox-label,
+            .sso-btn,
+            .login-footer {
+                font-size: 0.9rem;
+            }
+        }
+
+        /* 第三方登录图标 */
+        .oauth-icons { display: flex; justify-content: center; gap: 16px; margin-top: 4px; }
+        .oauth-icon {
+            width: 44px; height: 44px; border-radius: 12px;
+            border: 1.5px solid var(--border-color);
+            background: var(--panel-dark2);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .oauth-icon:hover { border-color: var(--cyber-blue); transform: translateY(-2px); }
+
+        /* 发送口令按钮 */
+        .send-code-btn {
+            position: absolute; right: 10px; top: 50%;
+            transform: translateY(-50%);
+            padding: 6px 12px; border-radius: 6px; border: none;
+            background: var(--panel-dark); color: var(--cyber-blue);
+            font-size: 0.8rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; white-space: nowrap;
+        }
+        .send-code-btn:hover { background: var(--border-color); }
+        .send-code-btn:disabled { color: var(--text-muted); cursor: not-allowed; }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="login-header">
-            <div class="logo">🦞</div>
-            <h1>Team Chat</h1>
-            <p>OpenClaw Agent 团队协作平台</p>
+    <div class="login-wrapper">
+        <!-- 左侧品牌区 -->
+        <div class="brand-panel">
+            <div class="brand-logo">🦞</div>
+            <div class="brand-title">Team Chat</div>
+            <div class="brand-desc">
+                OpenClaw Agent 团队协作平台<br>
+                多Agent智能协作，任务自动分发执行<br>
+                实时监控团队状态，效率倍增
+            </div>
+            <div class="brand-features">
+                <div class="brand-feature">
+                    <span class="brand-feature-icon">🤖</span>
+                    <span>多Agent智能协作，7×24小时自动运转</span>
+                </div>
+                <div class="brand-feature">
+                    <span class="brand-feature-icon">📊</span>
+                    <span>任务池自动分发，优先级智能调度</span>
+                </div>
+                <div class="brand-feature">
+                    <span class="brand-feature-icon">🔔</span>
+                    <span>可选通知适配器，按需接入邮件、Webhook 或企业通道</span>
+                </div>
+                <div class="brand-feature">
+                    <span class="brand-feature-icon">📈</span>
+                    <span>每日自动汇报，数据驱动决策</span>
+                </div>
+            </div>
+            <div class="brand-footer">Powered by the open-source OpenClaw TeamChat runtime</div>
         </div>
-        
-        <div class="error-message" id="error-msg"></div>
-        
-        <form id="login-form">
-            <div class="form-group">
-                <label for="password">访问密码</label>
-                <input type="password" id="password" placeholder="请输入访问密码" autocomplete="current-password" required>
+
+        <!-- 右侧登录面板 -->
+        <div class="login-panel" id="loginPanel">
+            <!-- 登录模式切换 -->
+            <div class="login-modes">
+                <button class="login-mode-btn active" data-mode="password" type="button">🔑 动态口令登录</button>
             </div>
-            
-            <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
-                <input type="checkbox" id="trust-device" style="width: 18px; height: 18px; cursor: pointer;">
-                <label for="trust-device" style="cursor: pointer; font-size: 14px; color: #666;">信任此设备（30天内免密登录）</label>
+
+            <!-- 错误提示 -->
+            <div class="error-message" id="error-msg">
+                <span>⚠️</span>
+                <span id="error-text"></span>
             </div>
-            
-            <button type="submit" class="login-btn" id="login-btn">登录</button>
-            
-            <button type="button" class="send-password-btn" id="send-password-btn" onclick="sendPasswordToWechat()">📤 发送登录口令到企业微信</button>
-        </form>
-        
-        <div class="local-hint">
-            本地访问？<a href="http://127.0.0.1:18788/">点击这里</a> 无需登录
+
+            <!-- 密码登录 -->
+            <div id="passwordMode">
+                <div class="login-header-text">欢迎回来 👋</div>
+                <div class="login-subtitle">请输入当前动态口令登录系统。受信任浏览器可在 30 天内自动续登。</div>
+
+                <form id="login-form" onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label class="form-label">访问密码</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">🔒</span>
+                            <input type="password" class="form-input" id="password"
+                                placeholder="请输入访问密码" autocomplete="current-password"
+                                oninput="checkPasswordStrength()" required>
+                            <span class="input-eye" id="togglePwd" onclick="togglePassword()" title="显示/隐藏密码">👁️</span>
+                        </div>
+                        <div class="password-strength" id="pwdStrength">
+                            <div class="strength-bar" id="s1"></div>
+                            <div class="strength-bar" id="s2"></div>
+                            <div class="strength-bar" id="s3"></div>
+                        </div>
+                        <div class="strength-label" id="strengthLabel"></div>
+                    </div>
+
+                    <div class="form-options">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="remember-me">
+                            <span>记住当前浏览器</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="trust-device" style="width:16px;height:16px;cursor:pointer;accent-color:var(--cyber-green);">
+                            <span>30天免密登录</span>
+                        </label>
+                    </div>
+
+                    <button type="submit" class="login-btn" id="login-btn">
+                        <span class="btn-spinner"></span>
+                        <span class="btn-text">🚀 登录系统</span>
+                    </button>
+                </form>
+
+                <div class="divider">或</div>
+
+                <button class="sso-btn" onclick="showAdapterNotice()" type="button">
+                    🔌 通知适配器未启用
+                </button>
+
+                <div class="login-footer">
+                    本地访问？<a href="http://127.0.0.1:18788/">直接进入</a>
+                </div>
+            </div>
+
+            <div id="wechatMode" style="display:none;"></div>
         </div>
     </div>
-    
+
+    <!-- 登录成功覆盖层 -->
+    <div class="success-overlay" id="successOverlay">
+        <div class="success-checkmark">✓</div>
+        <div class="success-text">登录成功！</div>
+        <div class="success-sub">正在跳转系统...</div>
+    </div>
+
     <script>
-        const form = document.getElementById('login-form');
-        const passwordInput = document.getElementById('password');
-        const loginBtn = document.getElementById('login-btn');
-        const errorMsg = document.getElementById('error-msg');
-        const trustDeviceCheckbox = document.getElementById('trust-device');
-        
+        // ========== 状态 ==========
+        let loginMode = 'password';
+        let pwdVisible = false;
+        let qrPollingTimer = null;
+        let qrExpired = false;
+        let qrToken = null;
+        let loginAttempts = 0;
+
         const SESSION_KEY = 'team_chat_session';
-        
-        function showError(message) {
-            errorMsg.textContent = message;
-            errorMsg.classList.add('show');
+        const REMEMBER_KEY = 'team_chat_remember';
+        const RETURN_TO = new URLSearchParams(window.location.search).get('returnTo') || '/';
+
+        function writeCookie(name, value, maxAge) {
+            const parts = [`${name}=${encodeURIComponent(value)}`, 'path=/', `max-age=${maxAge}`, 'SameSite=Lax'];
+            if (window.location.protocol === 'https:') {
+                parts.push('Secure');
+            }
+            document.cookie = parts.join('; ');
         }
-        
-        function hideError() {
-            errorMsg.classList.remove('show');
+
+        function persistSession(session) {
+            localStorage.setItem(SESSION_KEY, session);
+            writeCookie('session', session, 86400);
         }
-        
-        async function handleLogin(e) {
-            e.preventDefault();
-            hideError();
-            
-            const password = passwordInput.value.trim();
-            const trustDevice = trustDeviceCheckbox.checked;
-            
-            if (!password) {
-                showError('请输入密码');
+
+        // ========== 初始化 ==========
+        (function init() {
+            // 恢复记住状态
+            const remembered = localStorage.getItem(REMEMBER_KEY);
+            if (remembered) {
+                document.getElementById('remember-me').checked = true;
+            }
+
+            // 尽量主动清掉旧的 TeamChat 缓存壳，减少手机浏览器残留旧脚本的概率
+            cleanupStaleCaches();
+
+            // 自动检测信任设备
+            checkTrustedDevice();
+
+            // 聚焦密码框
+            setTimeout(() => document.getElementById('password').focus(), 100);
+
+            // Enter键快捷提交
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && loginMode === 'password') {
+                    handleLogin(e);
+                }
+            });
+        })();
+
+        async function cleanupStaleCaches() {
+            try {
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(registrations.map(reg => reg.update().catch(() => null)));
+                }
+                if ('caches' in window) {
+                    const keys = await caches.keys();
+                    await Promise.all(
+                        keys
+                            .filter(key => /^teamchat-shell-/i.test(key) && key !== 'teamchat-shell-v2')
+                            .map(key => caches.delete(key))
+                    );
+                }
+            } catch (e) {
+                // 静默失败，避免影响登录
+            }
+        }
+
+        // ========== 登录模式切换 ==========
+        function switchLoginMode() {
+            loginMode = 'password';
+            document.querySelectorAll('.login-mode-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.mode === 'password');
+            });
+            document.getElementById('passwordMode').style.display = 'block';
+            document.getElementById('wechatMode').style.display = 'none';
+            stopQrLogin();
+        }
+
+        // ========== 密码可见性切换 ==========
+        function togglePassword() {
+            pwdVisible = !pwdVisible;
+            const input = document.getElementById('password');
+            input.type = pwdVisible ? 'text' : 'password';
+            document.getElementById('togglePwd').textContent = pwdVisible ? '🙈' : '👁️';
+        }
+
+        // ========== 密码强度检测 ==========
+        function checkPasswordStrength() {
+            const pwd = document.getElementById('password').value;
+            const s1 = document.getElementById('s1');
+            const s2 = document.getElementById('s2');
+            const s3 = document.getElementById('s3');
+            const label = document.getElementById('strengthLabel');
+
+            // 只在有密码时显示强度条
+            if (!pwd) {
+                [s1,s2,s3].forEach(b => { b.classList.remove('active','weak','medium','strong'); });
+                label.textContent = '';
+                label.className = 'strength-label';
                 return;
             }
-            
-            loginBtn.disabled = true;
-            loginBtn.textContent = '登录中...';
-            
+
+            let score = 0;
+            if (pwd.length >= 8) score++;
+            if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score++;
+            if (/[0-9]/.test(pwd) && /[^A-Za-z0-9]/.test(pwd)) score++;
+
+            const levels = ['', 'weak', 'medium', 'strong', 'strong'];
+            const labels = ['', '弱 · 建议增加长度和特殊字符', '中 · 建议加入大写字母和符号', '强 · 密码强度良好'];
+            const activeClass = levels[score];
+
+            [s1,s2,s3].forEach((b, i) => {
+                b.classList.remove('active','weak','medium','strong');
+                if (i < score) {
+                    b.classList.add('active', activeClass);
+                }
+            });
+            label.textContent = labels[score];
+            label.className = 'strength-label ' + activeClass;
+        }
+
+        // ========== 错误提示 ==========
+        function showError(msg) {
+            const el = document.getElementById('error-msg');
+            document.getElementById('error-text').textContent = msg;
+            el.classList.add('show');
+            // 抖动动画
+            const panel = document.getElementById('loginPanel');
+            panel.classList.remove('shake');
+            void panel.offsetWidth; // reflow
+            panel.classList.add('shake');
+            setTimeout(() => panel.classList.remove('shake'), 600);
+        }
+
+        function hideError() {
+            document.getElementById('error-msg').classList.remove('show');
+        }
+
+        // ========== 登录处理 ==========
+        async function handleLogin(e) {
+            e && e.preventDefault();
+            hideError();
+
+            const password = document.getElementById('password').value.trim();
+            const rememberMe = document.getElementById('remember-me').checked;
+            const trustDevice = document.getElementById('trust-device').checked;
+
+            if (!password) {
+                showError('请输入访问密码');
+                document.getElementById('password').classList.add('error-field');
+                return;
+            }
+            document.getElementById('password').classList.remove('error-field');
+
+            const btn = document.getElementById('login-btn');
+            btn.disabled = true;
+            btn.classList.add('loading');
+            btn.querySelector('.btn-text').textContent = '验证中...';
+
             try {
                 const res = await fetch('/api/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ password, trustDevice })
                 });
-                
                 const data = await res.json();
-                
+
                 if (data.ok && data.session) {
-                    localStorage.setItem(SESSION_KEY, data.session);
-                    document.cookie = `session=${data.session}; path=/; max-age=86400; SameSite=None; Secure`;
-                    if (data.trustedDevice) {
-                        console.log('此设备已添加到信任列表');
+                    // 记住我
+                    if (rememberMe) {
+                        localStorage.setItem(REMEMBER_KEY, '1');
+                    } else {
+                        localStorage.removeItem(REMEMBER_KEY);
                     }
-                    window.location.replace('/?session=' + data.session);
+
+                    // 保存session
+                    persistSession(data.session);
+
+                    loginAttempts = 0;
+                    showSuccess();
                 } else {
-                    showError(data.error || '登录失败');
-                    loginBtn.disabled = false;
-                    loginBtn.textContent = '登录';
+                    loginAttempts++;
+                    const msg = data.error || '密码错误，请重试';
+                    showError(msg + (loginAttempts >= 3 ? ' （已尝试' + loginAttempts + '次）' : ''));
+                    btn.disabled = false;
+                    btn.classList.remove('loading');
+                    btn.querySelector('.btn-text').textContent = '🚀 登录系统';
                 }
             } catch (err) {
-                showError('网络错误，请重试');
-                loginBtn.disabled = false;
-                loginBtn.textContent = '登录';
+                showError('网络连接失败，请检查网络后重试');
+                btn.disabled = false;
+                btn.classList.remove('loading');
+                btn.querySelector('.btn-text').textContent = '🚀 登录系统';
             }
         }
-        
-        form.addEventListener('submit', handleLogin);
-        
-        var sessionChecked = false;
-        
-        async function checkSession() {
-            if (sessionChecked) return;
-            sessionChecked = true;
-            
-            // 先检查是否为信任设备
+
+        // ========== 信任设备检测 ==========
+        async function checkTrustedDevice() {
             try {
-                const trustRes = await fetch('/api/trusted-device/check');
-                const trustData = await trustRes.json();
-                
-                if (trustData.trusted) {
-                    // 信任设备，自动登录
-                    loginBtn.disabled = true;
-                    loginBtn.textContent = '自动登录中...';
-                    
-                    const res = await fetch('/api/login', {
+                const res = await fetch('/api/trusted-device/check');
+                const data = await res.json();
+                if (data.trusted) {
+                    const btn = document.getElementById('login-btn');
+                    btn.disabled = true;
+                    btn.classList.add('loading');
+                    btn.querySelector('.btn-text').textContent = '自动登录中...';
+
+                    const loginRes = await fetch('/api/login', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ trustDevice: true })
                     });
-                    
-                    const data = await res.json();
-                    if (data.ok && data.session) {
-                        localStorage.setItem(SESSION_KEY, data.session);
-                        document.cookie = `session=${data.session}; path=/; max-age=86400; SameSite=None; Secure`;
-                        window.location.replace('/?session=' + data.session);
-                        return;
+                    const loginData = await loginRes.json();
+                    if (loginData.ok && loginData.session) {
+                        persistSession(loginData.session);
+                        showSuccess();
+                    } else {
+                        btn.disabled = false;
+                        btn.classList.remove('loading');
+                        btn.querySelector('.btn-text').textContent = '🚀 登录系统';
                     }
-                    loginBtn.disabled = false;
-                    loginBtn.textContent = '登录';
                 }
             } catch (e) {
-                console.log('Trust check failed:', e);
+                // 忽略，继续正常登录流程
             }
-            
-            // 检查现有 session
+        }
+
+        // ========== 登录成功 ==========
+        function showSuccess() {
+            const overlay = document.getElementById('successOverlay');
+            overlay.classList.add('show');
+            setTimeout(() => {
+                const session = localStorage.getItem(SESSION_KEY) || '';
+                const separator = RETURN_TO.includes('?') ? '&' : '?';
+                window.location.replace(`${RETURN_TO}${separator}session=${encodeURIComponent(session)}`);
+            }, 1200);
+        }
+
+        // ========== 可选适配器提示 ==========
+        function showAdapterNotice() {
+            showToast('开源版默认不启用企业通道，请在 .env 中配置适配器后接入');
+        }
+
+        // ========== 二维码登录 ==========
+        // 扫码入口当前停用，避免展示无效功能造成误导
+        async function startQrLogin() {
+            showToast('扫码登录已停用，请使用动态口令或受信任浏览器自动登录');
+        }
+
+        async function pollQrStatus() {
+            return null;
+        }
+
+        function showQrExpired() {
+            qrExpired = true;
+            stopQrLogin();
+            const box = document.getElementById('qrBox');
+            box.innerHTML = `<div class="qr-expired">
+                <span style="font-size:2rem;">⏰</span>
+                <span>二维码已过期</span>
+                <button onclick="refreshQrCode()">🔄 刷新二维码</button>
+            </div>`;
+        }
+
+        function refreshQrCode() {
+            const box = document.getElementById('qrBox');
+            box.innerHTML = `<div style="font-size:3rem;color:var(--text-muted);">⏳</div>`;
+            startQrLogin();
+        }
+
+        function stopQrLogin() {
+            if (qrPollingTimer) {
+                clearInterval(qrPollingTimer);
+                qrPollingTimer = null;
+            }
+        }
+
+        // ========== Toast提示 ==========
+        function showToast(msg) {
+            // 复用error区域显示toast
+            const el = document.getElementById('error-msg');
+            document.getElementById('error-text').textContent = msg;
+            el.style.borderColor = 'rgba(63, 185, 80, 0.3)';
+            el.style.background = 'rgba(63, 185, 80, 0.1)';
+            el.style.color = 'var(--cyber-green)';
+            el.querySelector('span').textContent = '✓';
+            el.classList.add('show');
+            setTimeout(() => {
+                hideError();
+                el.style.borderColor = '';
+                el.style.background = '';
+                el.style.color = '';
+            }, 3000);
+        }
+
+        // ========== 输入框错误状态清理 ==========
+        document.getElementById('password').addEventListener('input', () => {
+            document.getElementById('password').classList.remove('error-field');
+            hideError();
+        });
+
+        // ========== 自动检测session跳转 ==========
+        (async function checkSession() {
             const session = localStorage.getItem(SESSION_KEY);
             if (session) {
                 try {
@@ -329,48 +795,13 @@
                     });
                     const data = await res.json();
                     if (data.authenticated) {
-                        document.cookie = `session=${session}; path=/; max-age=86400; SameSite=None; Secure`;
-                        window.location.replace('/?session=' + session);
+                        writeCookie('session', session, 86400);
+                        const separator = RETURN_TO.includes('?') ? '&' : '?';
+                        window.location.replace(`${RETURN_TO}${separator}session=${encodeURIComponent(session)}`);
                     }
-                } catch (e) {
-                    // 忽略错误，继续显示登录页面
-                }
+                } catch (e) {}
             }
-        }
-        
-        checkSession();
-        
-        // 发送密码到企微
-        async function sendPasswordToWechat() {
-            const btn = document.getElementById('send-password-btn');
-            btn.textContent = '发送中...';
-            btn.disabled = true;
-            
-            try {
-                // 调用API触发发送密码到企微
-                const response = await fetch('/api/password/send', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await response.json();
-                
-                if (data.success) {
-                    btn.textContent = '✅ 已发送';
-                    alert('登录口令已发送到企业微信！');
-                } else {
-                    btn.textContent = '📤 发送登录口令到企业微信';
-                    btn.disabled = false;
-                    alert(data.error || '发送失败');
-                }
-            } catch (e) {
-                btn.textContent = '📤 发送登录口令到企业微信';
-                btn.disabled = false;
-                alert('发送失败: ' + e.message);
-            }
-        }
-        
-        // 自动聚焦密码输入框
-        passwordInput.focus();
+        })();
     </script>
 </body>
 </html>

@@ -1,0 +1,6 @@
+{
+  "appId": "io.openclaw.teamchat",
+  "appName": "TeamChat",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

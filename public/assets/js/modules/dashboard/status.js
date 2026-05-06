@@ -1,104 +1,298 @@
+/**
+ * Status Dashboard - Agent 工作日志看板
+ * 瀑布流展示 agent 的工作过程：思考、行动、工具调用、报错等
+ */
+
+import { stateManager } from '../../core/state.js';
+import { eventBus } from '../../core/events.js';
+import { avatarService } from '../../services/avatar.js';
+
+const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+const MAX_LOGS_PER_AGENT = 200;
+const SESSION_KEY = 'team_chat_session';
+
+function getSessionToken() {
+    try {
+        return window.__INITIAL_SESSION__ || localStorage.getItem(SESSION_KEY) || '';
+    } catch {
+        return '';
+    }
+}
+
 export class StatusDashboard {
     constructor() {
         this.container = null;
+        this.visible = false;
+        this.agentLogs = new Map();
+        this.agentLastActive = new Map();
+        this.selectedAgentId = null;
+        this.initialized = false;
         this.sseConnection = null;
         this.sseConnected = false;
-        this.agentLogs = new Map();
-        this.isVisible = false;
-        this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 10;
+        this.visibilityHandler = null;
     }
 
-    init() {
-        this.createContainer();
+    init(options = {}) {
+        this.container = options.container || document.getElementById('status-dashboard');
+        
+        if (!this.container) {
+            this.createUI();
+        }
+        
         this.bindEvents();
-        this.connectSSE();
-        console.log('[Dashboard] Status dashboard initialized');
-    }
+        this.initialized = true;
 
-    createContainer() {
-        this.container = document.createElement('div');
-        this.container.className = 'status-dashboard';
-        this.container.id = 'status-dashboard';
-        this.container.innerHTML = `
-            <div class="status-header">
-                <h2>📋 Agent 工作日志</h2>
-                <button class="status-close" id="status-close">✕</button>
+        // 监听来自 Gateway 的事件
+        eventBus.on('agent:thinking', this.onThinking.bind(this));
+        eventBus.on('agent:tool_call', this.onToolCall.bind(this));
+        eventBus.on('agent:tool_result', this.onToolResult.bind(this));
+        eventBus.on('agent:planning', this.onPlanning.bind(this));
+        eventBus.on('agent:reflecting', this.onReflecting.bind(this));
+        eventBus.on('agent:action', this.onAction.bind(this));
+        eventBus.on('agent:complete', this.onComplete.bind(this));
+        eventBus.on('agent:error', this.onError.bind(this));
+        
+        this.visibilityHandler = () => {
+            if (document.hidden) {
+                this.disconnectSSE();
+            } else if (this.visible) {
+                this.connectSSE();
+            }
+        };
+        document.addEventListener('visibilitychange', this.visibilityHandler);
+
+        return this;
+    }
+    
+    createUI() {
+        const container = document.createElement('div');
+        container.className = 'status-dashboard';
+        container.id = 'status-dashboard';
+        container.innerHTML = `
+            <div class="dashboard-header">
+                <span>📋 Agent 工作日志</span>
+                <span class="dashboard-close" id="status-close">✕</span>
             </div>
-            <div class="status-content">
-                <div class="agent-tabs" id="agent-tabs"></div>
-                <div class="logs-container" id="logs-container">
-                    <div class="logs-empty">
-                        <p>选择一个 Agent 查看工作日志</p>
-                    </div>
-                </div>
+            <div class="dashboard-agents" id="dashboard-agents">
+                <div class="agents-list"></div>
+            </div>
+            <div class="dashboard-content" id="dashboard-content">
+                <div class="logs-container"></div>
             </div>
         `;
-        document.body.appendChild(this.container);
+        document.body.appendChild(container);
+        this.container = container;
     }
-
+    
     bindEvents() {
         const closeBtn = this.container.querySelector('#status-close');
-        closeBtn.addEventListener('click', () => this.hide());
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.hide();
+        });
+        
+        // Agent 标签页点击事件
+        this.container.addEventListener('click', (e) => {
+            const agentTab = e.target.closest('.agent-tab');
+            if (agentTab) {
+                e.stopPropagation();
+                const agentId = agentTab.dataset.agentId;
+                this.selectAgent(agentId);
+            }
+        });
     }
-
-    show() {
-        this.container.classList.add('visible');
-        this.isVisible = true;
-        if (!this.sseConnected) {
-            this.connectSSE();
-        }
-        this.refreshAgentList();
-    }
-
-    hide() {
-        this.container.classList.remove('visible');
-        this.isVisible = false;
-    }
-
+    
     connectSSE() {
+        if (!this.visible) return;
+        if (this.sseConnection && this.sseConnected) return;
+
+        const apiHost = window.location.port === '5173' ? 'http://localhost:18788' : window.location.origin;
+        const sessionToken = getSessionToken();
+        const sseUrl = sessionToken
+            ? `${apiHost}/api/agent-logs/stream?session=${encodeURIComponent(sessionToken)}`
+            : `${apiHost}/api/agent-logs/stream`;
+        
         try {
-            console.log('[Dashboard] Connecting to SSE...');
-            this.sseConnection = new EventSource('/api/agent-logs/stream');
-            
-            this.sseConnection.onopen = () => {
-                console.log('[Dashboard] SSE connection opened successfully');
-                this.sseConnected = true;
-                this.reconnectAttempts = 0;
-            };
+            if (this.sseConnection) {
+                this.sseConnection.close();
+            }
+            this.sseConnection = new EventSource(sseUrl);
+            this.sseConnected = false;
             
             this.sseConnection.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    this.handleSSEMessage(data);
+                    
+                    // 处理广播消息
+                    if (data.type === 'broadcast' && data.data) {
+                        this.handleBroadcast(data.data);
+                        return;
+                    }
+                    
+                    // 处理活动状态更新
+                    if (data.type === 'activity_status' && data.activity) {
+                        this.updateAgentActivity(data.activity);
+                        return;
+                    }
+                    
+                    // 处理日志
+                    if (data.agentId) {
+                        this.addLog(data.agentId, data);
+                    }
                 } catch (e) {
-                    console.error('[Dashboard] Failed to parse SSE message:', e);
+                    // Ignore parse errors
                 }
+            };
+
+            this.sseConnection.onopen = () => {
+                this.sseConnected = true;
+                console.log('[Dashboard] SSE connected');
             };
             
-            this.sseConnection.onerror = (error) => {
-                console.error('[Dashboard] SSE connection error:', error);
+            this.sseConnection.onerror = () => {
                 this.sseConnected = false;
-                this.sseConnection.close();
-                
-                if (this.reconnectAttempts < this.maxReconnectAttempts) {
-                    this.reconnectAttempts++;
-                    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-                    console.log(`[Dashboard] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
-                    setTimeout(() => this.connectSSE(), delay);
+                if (!this.visible || document.hidden) {
+                    this.disconnectSSE();
+                    return;
                 }
+                console.log('[Dashboard] SSE connection error, waiting for browser retry');
             };
         } catch (e) {
-            console.error('[Dashboard] Failed to create SSE connection:', e);
+            console.error('[Dashboard] SSE connection failed:', e);
         }
     }
 
-    handleSSEMessage(data) {
-        if (data.type === 'log') {
-            this.addLog(data.agentId, data.log);
-        } else if (data.type === 'agent_activity') {
-            this.updateAgentActivity(data.agentId, data.timestamp);
+    disconnectSSE() {
+        if (this.sseConnection) {
+            this.sseConnection.close();
+            this.sseConnection = null;
         }
+        this.sseConnected = false;
+    }
+    
+    handleBroadcast(broadcastMsg) {
+        // 触发消息事件
+        eventBus.emit('message:received', {
+            sender: broadcastMsg.sender || '系统',
+            text: broadcastMsg.text,
+            isUser: false,
+            timestamp: Date.now()
+        });
+    }
+    
+    updateAgentActivity(activity) {
+        if (!activity || !activity.agentId) return;
+        
+        const { agentId, timestamp } = activity;
+        this.agentLastActive.set(agentId, timestamp);
+        
+        if (this.visible) {
+            this.renderAgentsList();
+        }
+    }
+
+    onThinking({ agentId, content, thought }) {
+        const thinkingContent = content || thought;
+        if (!thinkingContent) return;
+        
+        this.addLog(agentId, {
+            type: 'thinking',
+            icon: '🧠',
+            title: '思考中',
+            content: thinkingContent,
+            time: Date.now()
+        });
+        
+        stateManager.addAgentLog(agentId, {
+            text: '🧠 思考: ' + thinkingContent.substring(0, 80),
+            type: 'thinking'
+        });
+    }
+
+    onToolCall({ agentId, tool, toolName, params, toolArgs }) {
+        const name = tool || toolName;
+        const args = params || toolArgs;
+        
+        this.addLog(agentId, {
+            type: 'tool_call',
+            icon: '🔧',
+            title: '调用工具',
+            content: `${name}(${JSON.stringify(args, null, 2)})`,
+            time: Date.now()
+        });
+        
+        stateManager.addAgentLog(agentId, {
+            text: '🔧 调用: ' + name,
+            type: 'tool'
+        });
+    }
+
+    onToolResult({ agentId, tool, toolName, result, content }) {
+        const name = tool || toolName;
+        const resultContent = result || content;
+        
+        this.addLog(agentId, {
+            type: 'tool_result',
+            icon: '✓',
+            title: '工具返回',
+            content: typeof resultContent === 'string' ? resultContent : JSON.stringify(resultContent, null, 2),
+            time: Date.now()
+        });
+        
+        stateManager.addAgentLog(agentId, {
+            text: '✓ 工具返回: ' + (typeof resultContent === 'string' ? resultContent.substring(0, 50) : '完成'),
+            type: 'success'
+        });
+    }
+
+    onPlanning({ agentId, plan }) {
+        this.addLog(agentId, {
+            type: 'planning',
+            icon: '📋',
+            title: '制定计划',
+            content: plan,
+            time: Date.now()
+        });
+    }
+
+    onReflecting({ agentId, reflection }) {
+        this.addLog(agentId, {
+            type: 'reflecting',
+            icon: '💭',
+            title: '自我反思',
+            content: reflection,
+            time: Date.now()
+        });
+    }
+
+    onAction({ agentId, action }) {
+        this.addLog(agentId, {
+            type: 'action',
+            icon: '⚡',
+            title: '执行动作',
+            content: action,
+            time: Date.now()
+        });
+    }
+
+    onComplete({ agentId, result }) {
+        this.addLog(agentId, {
+            type: 'complete',
+            icon: '✅',
+            title: '任务完成',
+            content: result,
+            time: Date.now()
+        });
+    }
+
+    onError({ agentId, error }) {
+        this.addLog(agentId, {
+            type: 'error',
+            icon: '❌',
+            title: '发生错误',
+            content: error,
+            time: Date.now()
+        });
     }
 
     addLog(agentId, log) {
@@ -107,78 +301,169 @@ export class StatusDashboard {
         }
         
         const logs = this.agentLogs.get(agentId);
-        logs.push(log);
         
-        if (logs.length > 100) {
-            logs.shift();
+        // 清理超过 3 天的日志
+        const threeDaysAgo = Date.now() - THREE_DAYS_MS;
+        const validLogs = logs.filter(l => l.time >= threeDaysAgo);
+        
+        // 添加新日志到开头
+        validLogs.unshift(log);
+        
+        // 限制每个 agent 最多 200 条日志
+        if (validLogs.length > MAX_LOGS_PER_AGENT) {
+            validLogs.splice(MAX_LOGS_PER_AGENT);
         }
         
-        if (this.isVisible) {
-            this.updateLogsDisplay(agentId);
-        }
-    }
+        this.agentLogs.set(agentId, validLogs);
+        this.agentLastActive.set(agentId, log.time);
 
-    updateAgentActivity(agentId, timestamp) {
-    }
-
-    async refreshAgentList() {
-        try {
-            const response = await fetch('/api/agents');
-            const agents = await response.json();
-            
-            const tabsContainer = this.container.querySelector('#agent-tabs');
-            tabsContainer.innerHTML = '';
-            
-            agents.forEach(agent => {
-                const tab = document.createElement('button');
-                tab.className = 'agent-tab';
-                tab.dataset.agentId = agent.id;
-                tab.innerHTML = `
-                    <span class="agent-icon">${agent.icon || '🤖'}</span>
-                    <span class="agent-name">${agent.name}</span>
-                `;
-                tab.addEventListener('click', () => this.selectAgent(agent.id));
-                tabsContainer.appendChild(tab);
-            });
-        } catch (e) {
-            console.error('[Dashboard] Failed to fetch agents:', e);
+        eventBus.emit('agent:trace', {
+            agentId,
+            trace: {
+                type: log.type,
+                title: log.title,
+                content: log.content,
+                status: log.type === 'error' ? 'error' : (log.type === 'tool_call' ? 'running' : 'success'),
+                time: log.time
+            }
+        });
+        
+        if (this.visible) {
+            this.render();
         }
     }
 
     selectAgent(agentId) {
-        const tabs = this.container.querySelectorAll('.agent-tab');
-        tabs.forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.agentId === agentId);
-        });
-        
-        this.updateLogsDisplay(agentId);
+        this.selectedAgentId = agentId;
+        this.render();
     }
 
-    updateLogsDisplay(agentId) {
-        const logsContainer = this.container.querySelector('#logs-container');
-        const logs = this.agentLogs.get(agentId) || [];
+    toggle() {
+        if (this.visible) {
+            this.hide();
+        } else {
+            this.show();
+        }
+    }
+
+    show() {
+        if (this.container) {
+            this.container.classList.add('active');
+        }
+        this.visible = true;
+        this.connectSSE();
+        this.render();
+    }
+
+    hide() {
+        if (this.container) {
+            this.container.classList.remove('active');
+        }
+        this.visible = false;
+        this.disconnectSSE();
+    }
+
+    render() {
+        this.renderAgentsList();
+        this.renderLogs();
+    }
+
+    renderAgentsList() {
+        const agentsList = this.container?.querySelector('.agents-list');
+        if (!agentsList) return;
+
+        const agents = stateManager.getState('agents') || [];
+        const agentBusyMap = stateManager.getState('agentBusyMap') || new Map();
         
+        // 按最后活跃时间排序
+        const sortedAgents = [...agents].sort((a, b) => {
+            const aTime = this.agentLastActive.get(a.agentId) || 0;
+            const bTime = this.agentLastActive.get(b.agentId) || 0;
+            return bTime - aTime;
+        });
+        
+        if (sortedAgents.length > 0 && !this.selectedAgentId) {
+            this.selectedAgentId = sortedAgents[0].agentId;
+        }
+
+        agentsList.innerHTML = sortedAgents.map(agent => {
+            const isBusy = agentBusyMap.get(agent.agentId);
+            const isSelected = this.selectedAgentId === agent.agentId;
+            const avatarUrl = avatarService.getUrl(agent.img);
+            const logCount = (this.agentLogs.get(agent.agentId) || []).length;
+            
+            return `
+                <div class="agent-tab ${isSelected ? 'selected' : ''} ${isBusy ? 'busy' : ''}" 
+                     data-agent-id="${agent.agentId}">
+                    <div class="agent-tab-avatar" style="background-image: url('${avatarUrl}')"></div>
+                    <div class="agent-tab-info">
+                        <span class="agent-tab-name">${agent.name}</span>
+                        <span class="agent-tab-count">${logCount}条</span>
+                    </div>
+                    ${isBusy ? '<span class="agent-busy-dot"></span>' : ''}
+                </div>
+            `;
+        }).join('');
+    }
+
+    renderLogs() {
+        const content = this.container?.querySelector('.logs-container');
+        if (!content) return;
+
+        if (!this.selectedAgentId) {
+            content.innerHTML = '<div class="empty-state">选择一个 Agent 查看工作日志</div>';
+            return;
+        }
+
+        const agents = stateManager.getState('agents') || [];
+        const agent = agents.find(a => a.agentId === this.selectedAgentId);
+        const logs = this.agentLogs.get(this.selectedAgentId) || [];
+        const agentBusyMap = stateManager.getState('agentBusyMap') || new Map();
+        const isBusy = agentBusyMap.get(this.selectedAgentId);
+
         if (logs.length === 0) {
-            logsContainer.innerHTML = `
-                <div class="logs-empty">
-                    <p>该 Agent 暂无工作日志</p>
+            content.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">${isBusy ? '🔥' : '💤'}</div>
+                    <div class="empty-text">${isBusy ? '正在工作中...' : '暂无工作日志'}</div>
                 </div>
             `;
             return;
         }
-        
-        logsContainer.innerHTML = logs.map(log => `
-            <div class="log-entry log-${log.type || 'info'}">
-                <div class="log-time">${new Date(log.time).toLocaleTimeString()}</div>
-                <div class="log-icon">${log.icon || '📝'}</div>
-                <div class="log-content">
-                    <div class="log-title">${log.title || ''}</div>
-                    ${log.content ? `<div class="log-text">${this.escapeHtml(log.content)}</div>` : ''}
-                </div>
+
+        content.innerHTML = `
+            <div class="logs-header">
+                <span class="logs-agent-name">${agent?.name || 'Unknown'}</span>
+                <span class="logs-count">${logs.length} 条记录</span>
             </div>
-        `).join('');
-        
-        logsContainer.scrollTop = logsContainer.scrollHeight;
+            <div class="logs-list">
+                ${logs.map(log => this.renderLogItem(log)).join('')}
+            </div>
+        `;
+    }
+
+    renderLogItem(log) {
+        return `
+            <div class="work-log-item ${log.type}">
+                <div class="log-item-header">
+                    <span class="log-icon">${log.icon}</span>
+                    <span class="log-title">${log.title}</span>
+                    <span class="log-time">${this.formatTime(new Date(log.time))}</span>
+                </div>
+                ${log.content ? `
+                    <div class="log-content">
+                        <pre>${this.escapeHtml(log.content)}</pre>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    formatTime(date) {
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const seconds = date.getSeconds().toString().padStart(2, '0');
+        return `${hours}:${minutes}:${seconds}`;
     }
 
     escapeHtml(text) {
@@ -186,4 +471,19 @@ export class StatusDashboard {
         div.textContent = text;
         return div.innerHTML;
     }
+
+    destroy() {
+        this.hide();
+        this.agentLogs.clear();
+        this.agentLastActive.clear();
+        this.disconnectSSE();
+        if (this.visibilityHandler) {
+            document.removeEventListener('visibilitychange', this.visibilityHandler);
+            this.visibilityHandler = null;
+        }
+    }
 }
+
+// 导出实例供 main.js 使用
+export const statusDashboard = new StatusDashboard();
+export default statusDashboard;

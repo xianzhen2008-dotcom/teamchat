@@ -1,45 +1,40 @@
 /**
- * TeamChat Dark Theme - 赛博科技暗色主题
+ * TeamChat Dark Theme
+ * 暗色模式基础色板
  */
 
+:root,
 [data-theme="dark"] {
-    --bg-primary: #0a0a0f;
-    --bg-secondary: #12121a;
-    --bg-tertiary: #1a1a25;
-    --bg-hover: rgba(0, 212, 255, 0.05);
-    --bg-active: rgba(0, 212, 255, 0.1);
-    
-    --text-primary: #ffffff;
-    --text-secondary: #a0a0b0;
-    --text-muted: #606070;
-    --text-inverse: #0a0a0f;
-    
-    --primary: #00d4ff;
-    --primary-dark: #00a8cc;
-    --primary-light: #5ce1ff;
-    
-    --accent: #ff006e;
-    --accent-glow: rgba(255, 0, 110, 0.3);
-    --success: #00f5d4;
-    --warning: #fee440;
-    --error: #f15bb5;
-    
-    --border-color: rgba(0, 212, 255, 0.15);
-    --border-hover: rgba(0, 212, 255, 0.3);
-    --border-active: rgba(0, 212, 255, 0.5);
-    
-    --msg-user-bg: linear-gradient(135deg, #00d4ff 0%, #00a8cc 100%);
-    --msg-agent-bg: rgba(0, 212, 255, 0.08);
-    
-    --input-bg: rgba(0, 0, 0, 0.3);
-    
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-    --shadow-glow: 0 0 20px rgba(0, 212, 255, 0.2);
-    --shadow-glow-strong: 0 0 30px rgba(0, 212, 255, 0.4);
-    
-    --status-online: #00f5d4;
-    --status-busy: #ff006e;
-    --status-offline: #606070;
+    color-scheme: dark;
+    --bg-primary: #07121d;
+    --bg-secondary: #0b1725;
+    --bg-tertiary: #13243a;
+
+    --surface-1: rgba(16, 25, 38, 0.9);
+    --surface-2: rgba(21, 33, 48, 0.82);
+    --surface-3: rgba(28, 43, 64, 0.9);
+    --surface-glass: rgba(11, 18, 28, 0.62);
+    --surface-glass-strong: rgba(11, 18, 28, 0.8);
+
+    --text-primary: #ebf3ff;
+    --text-secondary: #adc0d9;
+    --text-muted: #7e93ad;
+
+    --border-color: rgba(148, 163, 184, 0.16);
+    --input-bg: rgba(8, 16, 28, 0.72);
+    --bubble-agent-bg: rgba(15, 24, 36, 0.94);
+    --bubble-agent-border: rgba(148, 163, 184, 0.18);
+
+    --table-cell-bg: rgba(255, 255, 255, 0.025);
+
+    --bg-dark: var(--bg-primary);
+    --panel-dark: var(--surface-glass);
+    --panel-darker: var(--surface-glass-strong);
+    --text-main: var(--text-primary);
+    --msg-agent-bg: var(--bubble-agent-bg);
+    --msg-user-bg: var(--bubble-user-bg);
+    --cyber-blue: var(--accent);
+    --cyber-green: #34d399;
+    --cyber-red: #fb7185;
+    --cyber-purple: #c084fc;
 }

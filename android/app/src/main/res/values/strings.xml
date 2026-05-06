@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TeamChat</string>
+    <string name="title_activity_main">TeamChat</string>
+    <string name="package_name">io.openclaw.teamchat</string>
+    <string name="custom_url_scheme">io.openclaw.teamchat</string>
+</resources>

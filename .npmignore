@@ -1,37 +1,25 @@
-# Dependencies
 node_modules/
-
-# Build output
 dist/
-
-# Logs
+data/
+uploads/
+logs/
+message_logs/
+history_backups/
+core_backups/
+exports/
+output/
+*.db
+*.db-*
+*.sqlite
+*.jsonl
 *.log
-team_chat*.log
-*.log.*
-
-# Environment
 .env
-.env.local
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Temporary files
+.env.*
+!.env.example
+*.tmp
 *.bak
 *~
-tmp/
-temp/
-
-# Uploads
-uploads/
-
-# Backups
-backups/
-*_backup*
+.DS_Store
+android/.gradle/
+android/app/build/
+android/local.properties

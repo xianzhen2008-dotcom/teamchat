@@ -1,3 +1,47 @@
+function getAuthHeaders() {
+    const sessionToken = localStorage.getItem('team_chat_session') || '';
+    return sessionToken ? { 'X-Session-Token': sessionToken } : {};
+}
+
+function getVisibleMessageCount() {
+    try {
+        const renderedMessages = document.querySelectorAll('.messages-view .msg');
+        if (renderedMessages.length > 0) {
+            return renderedMessages.length;
+        }
+        const messages = window.stateManager?.getState?.('messages') || [];
+        return Array.isArray(messages)
+            ? messages.filter((message) => !window.__TEAMCHAT_IS_MESSAGE_HIDDEN__?.(message)).length
+            : 0;
+    } catch {
+        return 0;
+    }
+}
+
+function isHistoryLoaded() {
+    try {
+        return Boolean(window.stateManager?.getStateValue?.('historyLoaded'));
+    } catch {
+        return false;
+    }
+}
+
+function getHistoryError() {
+    try {
+        return window.stateManager?.getStateValue?.('historyError') || '';
+    } catch {
+        return '';
+    }
+}
+
+function isRealtimeConnected() {
+    try {
+        return Boolean(window.stateManager?.getStateValue?.('isConnected'));
+    } catch {
+        return false;
+    }
+}
+
 export class MetricsDashboard {
     constructor() {
         this.container = null;
@@ -19,6 +63,11 @@ export class MetricsDashboard {
             latency: 0,
             error: null
         };
+        this.cleanup = {
+            reclaimableBytes: 0,
+            fileCount: 0,
+            targets: []
+        };
         this.history = [];
         this.autoRefreshInterval = null;
         this.startTime = Date.now();
@@ -32,6 +81,11 @@ export class MetricsDashboard {
     }
 
     createContainer() {
+        const existing = document.getElementById('metrics-dashboard');
+        if (existing) {
+            existing.remove();
+        }
+
         this.container = document.createElement('div');
         this.container.className = 'metrics-dashboard';
         this.container.id = 'metrics-dashboard';
@@ -168,6 +222,13 @@ export class MetricsDashboard {
                         </button>
                     </div>
                 </div>
+                <div class="cleanup-section">
+                    <div class="cleanup-section-header">
+                        <h3>🧹 安全清理</h3>
+                        <div class="cleanup-summary" id="cleanup-summary">可释放 0 B</div>
+                    </div>
+                    <div class="cleanup-list" id="cleanup-list"></div>
+                </div>
                 <div class="metrics-chart">
                     <canvas id="metrics-chart"></canvas>
                 </div>
@@ -215,14 +276,37 @@ export class MetricsDashboard {
         restartTunnelBtn.addEventListener('click', () => this.adminAction('restart-tunnel', '重启 Tunnel'));
         
         const clearCacheBtn = this.container.querySelector('#clear-cache-btn');
-        clearCacheBtn.addEventListener('click', () => this.adminAction('clear-cache', '清空缓存'));
+        clearCacheBtn.addEventListener('click', () => this.confirmSafeCleanup());
     }
     
     async adminAction(action, label) {
         if (!confirm(`确定要${label}吗？`)) return;
+
+        const actionBtn = this.container.querySelector(`#${action}-btn`) || this.container.querySelector(`#${action.replace('restart-', 'restart-')}-btn`);
         
         try {
-            const response = await fetch(`/api/admin/${action}`, { method: 'POST' });
+            if (actionBtn) {
+                actionBtn.disabled = true;
+                actionBtn.dataset.originalLabel = actionBtn.querySelector('.btn-label')?.textContent || '';
+                const labelEl = actionBtn.querySelector('.btn-label');
+                if (labelEl) labelEl.textContent = '执行中...';
+            }
+            let response = await fetch(`/api/ops/${action}`, {
+                method: 'POST',
+                headers: {
+                    'X-TeamChat-Action-Origin': 'metrics-dashboard',
+                    ...getAuthHeaders()
+                }
+            });
+            if (!response.ok) {
+                response = await fetch(`/api/admin/${action}`, {
+                    method: 'POST',
+                    headers: {
+                        'X-TeamChat-Action-Origin': 'metrics-dashboard',
+                        ...getAuthHeaders()
+                    }
+                });
+            }
             const data = await response.json();
             
             if (data.success) {
@@ -236,6 +320,52 @@ export class MetricsDashboard {
         } catch (e) {
             console.error('[Metrics] Admin action failed:', e);
             alert(`${label}失败：${e.message}`);
+        } finally {
+            if (actionBtn) {
+                actionBtn.disabled = false;
+                const labelEl = actionBtn.querySelector('.btn-label');
+                if (labelEl && actionBtn.dataset.originalLabel) {
+                    labelEl.textContent = actionBtn.dataset.originalLabel;
+                }
+            }
+        }
+    }
+
+    async confirmSafeCleanup(targetIds = null) {
+        const targets = Array.isArray(targetIds) && targetIds.length > 0
+            ? this.cleanup.targets.filter((target) => targetIds.includes(target.id))
+            : this.cleanup.targets.filter((target) => target.fileCount > 0);
+
+        if (!targets.length) {
+            alert('当前没有可安全清理的日志或缓存文件。');
+            return;
+        }
+
+        const targetNames = targets.map((target) => `${target.title}（${this.formatBytes(target.bytes)} / ${target.fileCount} 个文件）`).join('\n');
+        const impactLines = targets.map((target) => `- ${target.title}：${target.impact}`).join('\n');
+        const confirmed = confirm(
+            `将安全清理以下内容：\n${targetNames}\n\n清理影响：\n${impactLines}\n\n不会删除数据库和当前聊天记录。是否继续？`
+        );
+        if (!confirmed) return;
+
+        try {
+            const response = await fetch('/api/ops/cleanup-safe', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...getAuthHeaders()
+                },
+                body: JSON.stringify({ targets: targets.map((target) => target.id) })
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || '清理失败');
+            }
+            alert(`已安全清理 ${data.cleanedFiles || 0} 个文件，释放 ${this.formatBytes(data.cleanedBytes || 0)}`);
+            await this.fetchMetrics();
+        } catch (e) {
+            console.error('[Metrics] Safe cleanup failed:', e);
+            alert(`安全清理失败：${e.message}`);
         }
     }
     
@@ -254,8 +384,10 @@ export class MetricsDashboard {
     }
     
     async fetchTunnelUrls() {
-        // 不再自动获取，改为点击刷新按钮时获取
-        console.log('[Metrics] Tunnel URLs will be fetched on demand');
+        await Promise.allSettled([
+            this.refreshTunnelUrl('teamchat'),
+            this.refreshTunnelUrl('mail')
+        ]);
     }
     
     async refreshTunnelUrl(type) {
@@ -264,8 +396,10 @@ export class MetricsDashboard {
         const refreshBtn = this.container.querySelector(`#refresh-${type}-btn`);
         
         try {
-            refreshBtn.textContent = '⏳';
-            const response = await fetch(url);
+            if (refreshBtn) refreshBtn.textContent = '⏳';
+            const response = await fetch(url, {
+                headers: getAuthHeaders()
+            });
             const data = await response.json();
             let tunnelUrl = data.url || '';
             
@@ -283,20 +417,27 @@ export class MetricsDashboard {
             // 存储完整 URL 用于打开
             this[`${type}TunnelUrl`] = data.url || '';
             
-            setTimeout(() => refreshBtn.textContent = '🔄', 1000);
+            if (refreshBtn) {
+                setTimeout(() => refreshBtn.textContent = '🔄', 1000);
+            }
         } catch (e) {
             console.error('[Metrics] Failed to refresh tunnel URL:', e);
             const input = this.container.querySelector(`#${inputId}`);
             if (input) {
                 input.value = '获取失败';
             }
-            refreshBtn.textContent = '❌';
-            setTimeout(() => refreshBtn.textContent = '🔄', 2000);
+            if (refreshBtn) {
+                refreshBtn.textContent = '❌';
+                setTimeout(() => refreshBtn.textContent = '🔄', 2000);
+            }
         }
     }
     
     openTunnelUrl(type) {
-        const tunnelUrl = this[`${type}TunnelUrl`];
+        const inputId = type === 'teamchat' ? 'teamchat-tunnel-url' : 'mail-tunnel-url';
+        const input = this.container.querySelector(`#${inputId}`);
+        const rawValue = this[`${type}TunnelUrl`] || input?.value || '';
+        const tunnelUrl = rawValue.replace(/\s+\(本地\)\s*$/, '').trim();
         if (!tunnelUrl) {
             alert('请先点击 🔄 刷新按钮获取最新链接');
             return;
@@ -322,6 +463,7 @@ export class MetricsDashboard {
     }
 
     startAutoRefresh() {
+        this.stopAutoRefresh();
         this.fetchMetrics();
         this.autoRefreshInterval = setInterval(() => {
             this.fetchMetrics();
@@ -337,70 +479,119 @@ export class MetricsDashboard {
 
     async fetchMetrics() {
         try {
-            const response = await fetch('/api/system-metrics');
+            const response = await fetch('/api/system-metrics', {
+                headers: getAuthHeaders()
+            });
             const data = await response.json();
             
             // 转换服务器数据格式
             if (data) {
                 // 从 data 中提取指标
-                this.metrics.cpuUsage = data.memory?.percent || 0;
+                this.metrics.cpuUsage = data.cpu?.percent || 0;
                 this.metrics.memoryUsage = (data.memory?.used || 0) / (1024 * 1024); // 转换为 MB
-                this.metrics.onlineUsers = data.teamchat?.users || 1;
+                this.metrics.onlineUsers = data.teamchat?.users || 0;
                 this.metrics.uptime = data.teamchat?.uptime || 0;
                 this.metrics.activeAgents = data.agents?.active || 0;
-                
-                // 从 history 获取消息数
-                const historyRes = await fetch('/history');
-                const history = await historyRes.json();
-                this.metrics.totalMessages = history.length || 0;
-                
-                // 计算消息速率（简单估算）
-                this.metrics.messagesPerSecond = this.metrics.totalMessages > 0 ? 
-                    (this.metrics.totalMessages / (this.metrics.uptime || 1)).toFixed(2) : 0;
+                this.metrics.totalMessages = data.teamchat?.totalMessages || 0;
+                this.metrics.messagesPerSecond = data.messageRate
+                    ? (Number(data.messageRate) / 60).toFixed(2)
+                    : (this.metrics.totalMessages > 0 ? (this.metrics.totalMessages / (this.metrics.uptime || 1)).toFixed(2) : 0);
+                this.metrics.successRate = data.successRate || 100;
+                this.cleanup = data.cleanup || this.cleanup;
+                this.syncStatus.serverCount = Number(data.teamchat?.totalMessages || 0);
+                this.syncStatus.localCount = getVisibleMessageCount();
+                this.syncStatus.diff = Math.max(0, this.syncStatus.serverCount - this.syncStatus.localCount);
+                this.syncStatus.latency = Number(data.gateway?.latency || 0);
+                this.syncStatus.lastSyncTime = Number(data.timestamp || Date.now());
+                this.syncStatus.error = getHistoryError() || null;
                 
                 this.updateDisplay();
+                this.renderCleanupTargets(data.agents);
+                this.updateSyncStatus();
                 this.addToHistory(this.metrics);
             }
         } catch (e) {
             console.error('[Metrics] Failed to fetch:', e);
+            this.syncStatus.error = e.message || '监控数据获取失败';
+            this.updateSyncStatus();
         }
     }
 
     updateDisplay() {
-        document.getElementById('metric-mps').textContent = `${this.metrics.messagesPerSecond} 条/秒`;
-        document.getElementById('metric-total').textContent = this.metrics.totalMessages.toLocaleString();
-        document.getElementById('metric-agents').textContent = this.metrics.activeAgents;
-        document.getElementById('metric-users').textContent = this.metrics.onlineUsers;
-        document.getElementById('metric-cpu').textContent = `${(this.metrics.cpuUsage || 0).toFixed(1)}%`;
-        document.getElementById('metric-memory').textContent = `${Math.round(this.metrics.memoryUsage || 0)} MB`;
-        document.getElementById('metric-uptime').textContent = this.formatUptime(this.metrics.uptime || 0);
+        this.container.querySelector('#metric-mps').textContent = `${this.metrics.messagesPerSecond} 条/秒`;
+        this.container.querySelector('#metric-total').textContent = this.metrics.totalMessages.toLocaleString();
+        this.container.querySelector('#metric-agents').textContent = this.metrics.activeAgents;
+        this.container.querySelector('#metric-users').textContent = this.metrics.onlineUsers;
+        this.container.querySelector('#metric-cpu').textContent = `${(this.metrics.cpuUsage || 0).toFixed(1)}%`;
+        this.container.querySelector('#metric-memory').textContent = `${Math.round(this.metrics.memoryUsage || 0)} MB`;
+        this.container.querySelector('#metric-uptime').textContent = this.formatUptime(this.metrics.uptime || 0);
+        this.container.querySelector('#metric-success').textContent = `${Math.round(this.metrics.successRate || 0)}%`;
+    }
+
+    renderCleanupTargets(agentMetrics = null) {
+        const summaryEl = this.container.querySelector('#cleanup-summary');
+        const listEl = this.container.querySelector('#cleanup-list');
+        if (!summaryEl || !listEl) return;
+
+        const activeText = agentMetrics
+            ? `活跃 ${agentMetrics.active || 0} / 总计 ${agentMetrics.total || 0}`
+            : '';
+        this.container.querySelector('#metric-agents').textContent = activeText || this.metrics.activeAgents;
+
+        summaryEl.textContent = `可释放 ${this.formatBytes(this.cleanup.reclaimableBytes || 0)}${this.cleanup.fileCount ? ` · ${this.cleanup.fileCount} 个文件` : ''}`;
+        listEl.innerHTML = '';
+
+        for (const target of this.cleanup.targets || []) {
+            const item = document.createElement('div');
+            item.className = 'cleanup-item';
+            item.innerHTML = `
+                <div class="cleanup-item-main">
+                    <div class="cleanup-item-title">${target.title}</div>
+                    <div class="cleanup-item-meta">${this.formatBytes(target.bytes)} · ${target.fileCount} 个文件</div>
+                    <div class="cleanup-item-desc">${target.description}</div>
+                    <div class="cleanup-item-impact">${target.impact}</div>
+                </div>
+                <button class="cleanup-action-btn" ${target.fileCount ? '' : 'disabled'}>清理</button>
+            `;
+            item.querySelector('.cleanup-action-btn')?.addEventListener('click', () => this.confirmSafeCleanup([target.id]));
+            listEl.appendChild(item);
+        }
+
+        if (!listEl.children.length) {
+            listEl.innerHTML = '<div class="cleanup-empty">当前没有可安全清理的日志或缓存。</div>';
+        }
     }
 
     updateSyncStatus() {
-        document.getElementById('sync-server-count').textContent = this.syncStatus.serverCount;
-        document.getElementById('sync-local-count').textContent = this.syncStatus.localCount;
-        document.getElementById('sync-diff').textContent = this.syncStatus.diff;
-        document.getElementById('sync-latency').textContent = `${this.syncStatus.latency}ms`;
+        this.container.querySelector('#sync-server-count').textContent = this.syncStatus.serverCount;
+        this.container.querySelector('#sync-local-count').textContent = this.syncStatus.localCount;
+        this.container.querySelector('#sync-diff').textContent = this.syncStatus.diff;
+        this.container.querySelector('#sync-latency').textContent = `${this.syncStatus.latency}ms`;
         
         if (this.syncStatus.lastSyncTime) {
-            document.getElementById('sync-last-time').textContent = 
+            this.container.querySelector('#sync-last-time').textContent = 
                 new Date(this.syncStatus.lastSyncTime).toLocaleTimeString();
         }
         
-        const connectionEl = document.getElementById('sync-connection');
-        if (navigator.onLine) {
+        const connectionEl = this.container.querySelector('#sync-connection');
+        if (navigator.onLine && isRealtimeConnected()) {
             connectionEl.innerHTML = '<span class="status-dot status-connected"></span> 已连接';
+        } else if (navigator.onLine) {
+            connectionEl.innerHTML = '<span class="status-dot status-disconnected"></span> 连接中';
         } else {
             connectionEl.innerHTML = '<span class="status-dot status-disconnected"></span> 未连接';
         }
         
-        const messageEl = document.getElementById('sync-status-message');
+        const messageEl = this.container.querySelector('#sync-status-message');
         if (this.syncStatus.syncInProgress) {
             messageEl.textContent = '🔄 同步中...';
             messageEl.className = 'sync-status-message syncing';
         } else if (this.syncStatus.error) {
             messageEl.textContent = `❌ 错误: ${this.syncStatus.error}`;
             messageEl.className = 'sync-status-message error';
+        } else if (this.syncStatus.serverCount > 0 && this.syncStatus.localCount === 0 && isHistoryLoaded()) {
+            messageEl.textContent = '⚠️ 服务端有消息，但当前页面未显示，请刷新或重新登录';
+            messageEl.className = 'sync-status-message warning';
         } else if (this.syncStatus.diff > 0) {
             messageEl.textContent = '⚠️ 发现差异消息，正在同步...';
             messageEl.className = 'sync-status-message warning';
@@ -446,6 +637,18 @@ export class MetricsDashboard {
         const m = Math.floor((seconds % 3600) / 60);
         const s = Math.floor(seconds % 60);
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    formatBytes(bytes) {
+        if (!bytes) return '0 B';
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let size = bytes;
+        let unitIndex = 0;
+        while (size >= 1024 && unitIndex < units.length - 1) {
+            size /= 1024;
+            unitIndex += 1;
+        }
+        return `${size.toFixed(size >= 100 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
     }
 }
 

@@ -59,29 +59,20 @@ class SidebarModule {
     }
 
     handleAgentClick(e) {
-        // 检查是否点击了头像
+        // 点击头像或整个item都选择agent并触发mention
         const avatar = e.target.closest('.agent-avatar');
-        if (avatar) {
-            const agentItem = avatar.closest('.agent-item');
-            if (agentItem) {
-                const agentId = agentItem.dataset.agentId;
-                const agents = stateManager.getState('agents') || [];
-                const agent = agents.find(a => a.agentId === agentId);
-                if (agent) {
-                    eventBus.emit('mention:request', { name: agent.name });
-                }
-            }
-            return;
-        }
-        
-        // 点击整个item选择agent
-        const agentItem = e.target.closest('.agent-item');
+        const agentItem = avatar ? avatar.closest('.agent-item') : e.target.closest('.agent-item');
         if (!agentItem) return;
-        
+
         const agentId = agentItem.dataset.agentId;
-        if (agentId) {
-            this.selectAgent(agentId);
+        if (!agentId) return;
+
+        const agents = stateManager.getState('agents') || [];
+        const agent = agents.find(a => a.agentId === agentId);
+        if (agent) {
+            eventBus.emit('mention:request', { name: agent.name });
         }
+        this.selectAgent(agentId);
     }
 
     selectAgent(agentId) {

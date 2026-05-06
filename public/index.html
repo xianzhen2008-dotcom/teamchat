@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#eef8f3">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="description" content="TeamChat is an open-source multi-agent team chat workspace with realtime messaging, action logs, notifications, and mobile-ready layouts.">
+    <title>TeamChat - Multi-Agent Workspace</title>
+    <link rel="icon" href="/icons/teamchat-192.png" type="image/png">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/icons/teamchat-192.png">
+    
+    <link rel="stylesheet" href="/css/variables.css?v=274">
+    <link rel="stylesheet" href="/css/base.css?v=274">
+    <link rel="stylesheet" href="/css/components.css?v=274">
+    <link rel="stylesheet" href="/css/layout.css?v=274">
+    <link rel="stylesheet" href="/css/mobile.css?v=274">
+    <link rel="stylesheet" href="/css/skins.css?v=274">
+
+    <link rel="preload" href="/assets/avatars/agent-main.svg" as="image">
+</head>
+<body data-skin="fresh">
+    <div class="app-container">
+        <aside class="sidebar" id="sidebar">
+            <header class="sidebar-header">
+                <h2>🤖 Agents</h2>
+            </header>
+            <div class="agent-list" id="agent-list"></div>
+        </aside>
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+        <main class="chat-container">
+            <header class="chat-header">
+                <button class="header-btn" id="menu-toggle">☰</button>
+                <div class="header-title">
+                    <span id="current-agent-name">TeamChat</span>
+                    <span class="connection-status" id="connection-status"></span>
+                    <span class="version-info" id="version-info">v278</span>
+                </div>
+                <div class="header-actions">
+                    <button class="header-btn desktop-only" id="search-toggle" title="搜索">🔍</button>
+                    <button class="header-btn desktop-only" id="filter-toggle" title="筛选">🏷️</button>
+                    <button class="header-btn desktop-only" id="status-toggle" title="工作日志">📋</button>
+                    <button class="header-btn desktop-only" id="metrics-toggle" title="性能监控">📈</button>
+                    <button class="header-btn desktop-only" id="email-monitor-toggle" title="邮件监控">📧</button>
+                    <button class="header-btn more-toggle" id="more-toggle" title="更多">⋯</button>
+                    <div class="header-dropdown" id="header-dropdown">
+                        <button class="dropdown-item mobile-only" id="search-toggle-2">
+                            <span class="dropdown-icon">🔍</span>
+                            <span>搜索</span>
+                        </button>
+                        <button class="dropdown-item mobile-only" id="filter-toggle-2">
+                            <span class="dropdown-icon">🏷️</span>
+                            <span>筛选</span>
+                        </button>
+                        <button class="dropdown-item mobile-only" id="status-toggle-2">
+                            <span class="dropdown-icon">📋</span>
+                            <span>工作日志</span>
+                        </button>
+                        <button class="dropdown-item mobile-only" id="metrics-toggle-2">
+                            <span class="dropdown-icon">📈</span>
+                            <span>性能监控</span>
+                        </button>
+                        <button class="dropdown-item mobile-only" id="email-monitor-toggle-2">
+                            <span class="dropdown-icon">📧</span>
+                            <span>邮件监控</span>
+                        </button>
+                        <div class="dropdown-divider mobile-only"></div>
+                        <button class="dropdown-item" id="scroll-lock-toggle-2">
+                            <span class="dropdown-icon">🔓</span>
+                            <span>锁定滚动</span>
+                        </button>
+                        <div class="dropdown-divider"></div>
+                        <div class="dropdown-section-title">外观皮肤</div>
+                        <button class="dropdown-item" id="skin-toggle-2">
+                            <span class="dropdown-icon">🪄</span>
+                            <span>轮换皮肤</span>
+                            <span class="dropdown-meta" id="skin-current-badge">小清新</span>
+                        </button>
+                        <div class="dropdown-section-title">风格皮肤</div>
+                        <button class="dropdown-item skin-option" data-skin="fresh" aria-pressed="true">
+                            <span class="dropdown-icon">❋</span>
+                            <span>小清新</span>
+                            <span class="dropdown-meta">Fresh</span>
+                        </button>
+                        <button class="dropdown-item skin-option" data-skin="glass" aria-pressed="false">
+                            <span class="dropdown-icon">◇</span>
+                            <span>黑色玻璃</span>
+                            <span class="dropdown-meta">Glass</span>
+                        </button>
+                        <button class="dropdown-item skin-option" data-skin="cyber" aria-pressed="false">
+                            <span class="dropdown-icon">◈</span>
+                            <span>赛博科技</span>
+                            <span class="dropdown-meta">Cyber</span>
+                        </button>
+                        <button class="dropdown-item skin-option" data-skin="editorial" aria-pressed="false">
+                            <span class="dropdown-icon">◌</span>
+                            <span>杂志阅读</span>
+                            <span class="dropdown-meta">Editorial</span>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="search-container" id="search-container">
+                <input type="text" id="search-input" placeholder="搜索消息...">
+                <span class="search-info"></span>
+                <span class="search-close">✕</span>
+            </div>
+
+            <section class="teamchat-notice-strip" id="teamchat-notice-strip" aria-label="TeamChat 通知"></section>
+
+            <div class="messages-view" id="messages-view">
+                <div class="messages-loading-state">
+                    <div class="messages-loading-pulse"></div>
+                    <div class="messages-loading-lines">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <div class="messages-loading-text">正在加载历史消息...</div>
+                </div>
+            </div>
+
+            <div class="input-area" id="input-area">
+                <div class="file-preview" id="file-preview"></div>
+                <div class="input-row">
+                    <button class="btn-action" id="upload-btn" title="上传文件">📎</button>
+                    <textarea id="chat-input" placeholder="输入消息... (@ 提及 Agent)" rows="1"></textarea>
+                    <button class="btn-send" id="send-btn">➤</button>
+                </div>
+                <input type="file" id="file-input" multiple hidden>
+            </div>
+        </main>
+
+        <div class="filter-panel" id="filter-panel">
+            <div class="filter-panel-header">
+                <span>筛选消息</span>
+                <span class="filter-panel-close">✕</span>
+            </div>
+            <div class="filter-quick-btns">
+                <button class="filter-quick-btn" data-filter="all">全部</button>
+                <button class="filter-quick-btn" data-filter="dev">开发组</button>
+            </div>
+            <div class="filter-options" id="filter-options"></div>
+            <div class="filter-agent-grid" id="filter-agent-grid"></div>
+        </div>
+        <div class="filter-panel-overlay" id="filter-panel-overlay"></div>
+
+        <div class="mention-menu" id="mention-menu"></div>
+
+        <div class="toast-container" id="toast-container"></div>
+    </div>
+
+    <script type="module" src="./assets/js/main.js?v=278"></script>
+</body>
+</html>
