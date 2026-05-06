@@ -2,6 +2,7 @@
 'use strict';
 
 const { execFileSync } = require('child_process');
+const fs = require('fs');
 
 const forbiddenTracked = [
   /(^|\/)node_modules\//,
@@ -48,26 +49,38 @@ if (badTracked.length) {
 }
 
 let grepFailed = false;
-for (const pattern of riskyPatterns) {
+const scanExcludes = [
+  /(^|\/)node_modules\//,
+  /(^|\/)dist\//,
+  /(^|\/)android\/\.gradle\//,
+  /(^|\/)data\//,
+  /(^|\/)package-lock\.json$/
+];
+
+function readTextIfSafe(file) {
   try {
-    const output = execFileSync('rg', [
-      '-n',
-      '--fixed-strings',
-      pattern,
-      '--glob', '!node_modules/**',
-      '--glob', '!dist/**',
-      '--glob', '!android/.gradle/**',
-      '--glob', '!data/**',
-      '.'
-    ], { encoding: 'utf8' }).trim();
-    if (output) {
+    const data = fs.readFileSync(file);
+    if (data.includes(0)) return null;
+    return data.toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
+for (const pattern of riskyPatterns) {
+  for (const file of tracked) {
+    if (scanExcludes.some((exclude) => exclude.test(file))) continue;
+    const text = readTextIfSafe(file);
+    if (!text) continue;
+    const lines = text.split(/\r?\n/);
+    lines.forEach((line, index) => {
+      if (line.includes(pattern)) {
       grepFailed = true;
       console.error(`Risky pattern found: ${pattern}`);
-      console.error(output);
+        console.error(`${file}:${index + 1}:${line}`);
+      }
+    });
     }
-  } catch (error) {
-    if (error.status !== 1) throw error;
-  }
 }
 
 if (grepFailed) {
