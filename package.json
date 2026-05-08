@@ -1,5 +1,5 @@
 {
-  "name": "@openclaw/teamchat",
+  "name": "@xianzhen2008-dotcom/teamchat",
   "version": "1.1.0",
   "description": "Open-source multi-agent team chat workspace with realtime messaging, action logs, PWA, and Android packaging.",
   "type": "module",
