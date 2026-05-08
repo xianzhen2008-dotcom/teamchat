@@ -1,0 +1,58 @@
+{
+  "id": "teamchat",
+  "name": "TeamChat",
+  "description": "Open-source multi-agent TeamChat workspace with real-time messaging, setup wizard, PWA, Android packaging, and optional channel adapters.",
+  "version": "1.1.0",
+  "uiHints": {
+    "port": {
+      "label": "TeamChat port",
+      "placeholder": "18788",
+      "help": "HTTP port used by the standalone TeamChat server."
+    },
+    "publicBaseUrl": {
+      "label": "Public base URL",
+      "placeholder": "https://teamchat.example.com",
+      "help": "External URL when TeamChat is exposed through a tunnel or reverse proxy."
+    },
+    "authMode": {
+      "label": "Authentication mode",
+      "help": "Use password mode before exposing TeamChat beyond localhost."
+    },
+    "agentDiscoveryPaths": {
+      "label": "Agent discovery paths",
+      "placeholder": "./agents,./config/agents.json",
+      "help": "Comma-separated folders or JSON files used to build the local agent roster."
+    },
+    "channels": {
+      "label": "Monitored channels",
+      "placeholder": "teamchat,tui,telegram,wecom,weixin,feishu,qqbot",
+      "help": "Comma-separated channels shown in TeamChat channel status."
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "port": {
+        "type": "number",
+        "default": 18788
+      },
+      "publicBaseUrl": {
+        "type": "string"
+      },
+      "authMode": {
+        "type": "string",
+        "enum": ["none", "password"],
+        "default": "none"
+      },
+      "agentDiscoveryPaths": {
+        "type": "string",
+        "default": "./agents,./config/agents.json"
+      },
+      "channels": {
+        "type": "string",
+        "default": "teamchat,tui,telegram,wecom,weixin,feishu,qqbot"
+      }
+    }
+  }
+}

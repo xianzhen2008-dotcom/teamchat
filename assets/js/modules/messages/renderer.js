@@ -25,7 +25,6 @@ const CHANNEL_LABELS = {
     lark: 'Feishu',
     telegram: 'Telegram',
     whatsapp: 'WhatsApp',
-    email: 'Mail',
     system: 'System'
 };
 

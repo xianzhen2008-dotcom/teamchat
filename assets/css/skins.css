@@ -163,7 +163,6 @@ body[data-skin] .input-area,
 body[data-skin] .filter-panel,
 body[data-skin] .header-dropdown,
 body[data-skin] .dashboard-panel,
-body[data-skin] .email-monitor-panel,
 body[data-skin] .metrics-panel {
     background: var(--surface-glass-strong) !important;
     border-color: var(--border-color) !important;

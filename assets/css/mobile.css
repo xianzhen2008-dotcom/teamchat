@@ -1453,7 +1453,6 @@
 
     .header-dropdown,
     .metrics-content,
-    .email-monitor-content,
     .search-container,
     .filter-panel,
     .agent-list,
@@ -1591,55 +1590,6 @@
         min-height: 42px;
     }
 
-    .email-monitor-dashboard {
-        inset: calc(var(--safe-top) + 8px) 8px calc(var(--safe-bottom) + 8px) 8px;
-        width: auto;
-        max-width: none;
-        max-height: none;
-        left: 8px;
-        right: 8px;
-        top: calc(var(--safe-top) + 8px);
-        border-radius: 22px;
-        z-index: 2200;
-    }
-
-    .email-monitor-content {
-        padding: 14px;
-        max-height: none;
-        height: calc(100% - 54px);
-        box-sizing: border-box;
-    }
-
-    .email-monitor-content .status-grid,
-    .email-monitor-content .counts-grid,
-    .email-monitor-content .time-grid,
-    .email-monitor-content .pending-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
-        margin-bottom: 14px;
-    }
-
-    .email-monitor-content .status-item,
-    .email-monitor-content .count-item,
-    .email-monitor-content .time-item,
-    .email-monitor-content .pending-item {
-        padding: 10px 8px;
-    }
-
-    .email-monitor-content .status-value,
-    .email-monitor-content .count-value,
-    .email-monitor-content .time-value,
-    .email-monitor-content .pending-value,
-    .email-monitor-content .storage-value {
-        font-size: 14px;
-    }
-
-    .email-monitor-content .actions-section {
-        position: sticky;
-        bottom: 0;
-        padding-top: 8px;
-        background: linear-gradient(180deg, rgba(22, 27, 34, 0), rgba(22, 27, 34, 0.98) 36%);
-    }
 }
 
 @media (max-width: 768px) {

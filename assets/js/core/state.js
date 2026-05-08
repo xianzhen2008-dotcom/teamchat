@@ -100,7 +100,6 @@ const initialAgents = [
     { id: 'devops', agentId: 'devops', name: getAgentDisplayName('devops'), role: 'Operations', color: '#fca130', img: 'agent-ops.svg' },
     { id: 'qa', agentId: 'qa', name: getAgentDisplayName('qa'), role: 'Quality assurance', color: '#9012fe', img: 'agent-qa.svg' },
     { id: 'mobile', agentId: 'mobile', name: getAgentDisplayName('mobile'), role: 'Mobile app', color: '#0db7ed', img: 'agent-mobile.svg' },
-    { id: 'mail', agentId: 'mail', name: getAgentDisplayName('mail'), role: 'Inbox adapter', color: '#e3b341', img: 'agent-mail.svg' },
     { id: 'writer', agentId: 'writer', name: getAgentDisplayName('writer'), role: 'Content and documentation', color: '#f778ba', img: 'agent-writer.svg' },
     { id: 'data', agentId: 'data', name: getAgentDisplayName('data'), role: 'Analytics', color: '#388bfd', img: 'agent-data.svg' },
     { id: 'finance', agentId: 'finance', name: getAgentDisplayName('finance'), role: 'Finance assistant', color: '#3fb950', img: 'agent-finance.svg' }

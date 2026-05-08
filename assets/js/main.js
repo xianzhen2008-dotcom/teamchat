@@ -21,7 +21,7 @@ import { searchModule } from './modules/search/index.js';
 import { teamchatNotificationsModule } from './modules/notifications/index.js';
 import { statusDashboard } from './modules/dashboard/status.js';
 import { metricsDashboard } from './modules/dashboard/metrics.js';
-import { emailMonitorDashboard } from './modules/dashboard/email-monitor.js';
+import { settingsModule } from './modules/settings/index.js';
 import { themeModule } from './modules/theme/index.js';
 import { initPwaSupport } from './services/pwa.js';
 
@@ -31,7 +31,6 @@ function getAgentAvatar(agentId, agentName) {
     const avatarMap = {
         main: 'agent-main.svg',
         writer: 'agent-writer.svg',
-        mail: 'agent-mail.svg',
         data: 'agent-data.svg',
         qa: 'agent-qa.svg',
         pm: 'agent-pm.svg',
@@ -419,10 +418,12 @@ async function initApp() {
 
     statusDashboard.init();
     metricsDashboard.init();
-    emailMonitorDashboard.init();
 
     // 初始化主题
     themeModule.init();
+    settingsModule.init({
+        container: document.getElementById('settings-panel')
+    });
     
     // 初始化工作日志按钮（桌面端和移动端）
     const statusToggle = document.getElementById('status-toggle');
@@ -461,25 +462,21 @@ async function initApp() {
         metricsToggle2.addEventListener('click', handleMetricsToggle);
     }
 
-    // 初始化邮件监控按钮（桌面端和移动端）
-    const emailMonitorToggle = document.getElementById('email-monitor-toggle');
-    const emailMonitorToggle2 = document.getElementById('email-monitor-toggle-2');
-    console.log('[Main] Email monitor toggle buttons:', { emailMonitorToggle: !!emailMonitorToggle, emailMonitorToggle2: !!emailMonitorToggle2 });
-    const handleEmailMonitorToggle = (e) => {
-        console.log('[Main] Email monitor toggle clicked', e?.target?.id);
+    // 初始化设置按钮（桌面端和移动端）
+    const settingsToggle = document.getElementById('settings-toggle');
+    const settingsToggle2 = document.getElementById('settings-toggle-2');
+    const handleSettingsToggle = (e) => {
         e?.stopPropagation?.();
         e?.preventDefault?.();
-        emailMonitorDashboard.toggle();
+        settingsModule.show();
         const dropdown = document.getElementById('header-dropdown');
         if (dropdown) dropdown.classList.remove('show');
     };
-    if (emailMonitorToggle) {
-        emailMonitorToggle.addEventListener('click', handleEmailMonitorToggle);
-        console.log('[Main] Bound email-monitor-toggle click event');
+    if (settingsToggle) {
+        settingsToggle.addEventListener('click', handleSettingsToggle);
     }
-    if (emailMonitorToggle2) {
-        emailMonitorToggle2.addEventListener('click', handleEmailMonitorToggle);
-        console.log('[Main] Bound email-monitor-toggle-2 click event');
+    if (settingsToggle2) {
+        settingsToggle2.addEventListener('click', handleSettingsToggle);
     }
 
     // 初始化智库日报按钮（桌面端和移动端）- 跳转到远程链接
@@ -573,27 +570,6 @@ async function initApp() {
     }
     if (scrollLockBtn2) {
         scrollLockBtn2.addEventListener('click', handleScrollLock);
-    }
-
-    // 初始化邮件链接
-    const mailLink = document.getElementById('mail-link') || document.getElementById('mail-link-2');
-    if (mailLink) {
-        fetch('/api/mail-tunnel', {
-            headers: getAuthHeaders()
-        })
-            .then(res => res.json())
-            .then(data => {
-                const mailUrl = data.url;
-                if (mailUrl) {
-                    mailLink.href = mailUrl;
-                } else {
-                    mailLink.href = 'http://localhost:3001';
-                }
-            })
-            .catch(err => {
-                console.warn('[Mail] Failed to fetch mail tunnel URL:', err);
-                mailLink.href = 'http://localhost:3001';
-            });
     }
 
     // 初始化移动端下拉菜单
@@ -796,11 +772,11 @@ async function initApp() {
             metricsDashboard.hide();
         }
 
-        const emailContainer = document.getElementById('email-monitor-dashboard');
-        const emailToggles = [document.getElementById('email-monitor-toggle'), document.getElementById('email-monitor-toggle-2')];
-        if ((emailMonitorDashboard.visible || emailContainer?.classList.contains('active') || emailContainer?.classList.contains('visible'))
-            && !clickHitsAny(target, [emailContainer, ...emailToggles])) {
-            emailMonitorDashboard.hide();
+        const settingsContainer = document.getElementById('settings-panel');
+        const settingsToggles = [document.getElementById('settings-toggle'), document.getElementById('settings-toggle-2')];
+        if ((settingsModule.visible || settingsContainer?.classList.contains('visible'))
+            && !clickHitsAny(target, [settingsContainer, ...settingsToggles])) {
+            settingsModule.hide();
         }
 
         const mentionMenu = document.getElementById('mention-menu');
@@ -848,9 +824,9 @@ async function initApp() {
             return true;
         }
 
-        const emailContainer = document.getElementById('email-monitor-dashboard');
-        if (emailMonitorDashboard.visible || emailContainer?.classList.contains('active') || emailContainer?.classList.contains('visible')) {
-            emailMonitorDashboard.hide();
+        const settingsContainer = document.getElementById('settings-panel');
+        if (settingsModule.visible || settingsContainer?.classList.contains('visible')) {
+            settingsModule.hide();
             return true;
         }
 

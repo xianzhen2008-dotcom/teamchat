@@ -318,8 +318,6 @@ function normalizeKnownChannel(value) {
         tg: 'telegram',
         whatsapp: 'whatsapp',
         wa: 'whatsapp',
-        email: 'email',
-        mail: 'email',
         system: 'system',
         sys: 'system'
     };

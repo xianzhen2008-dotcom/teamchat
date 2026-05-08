@@ -19,6 +19,7 @@ const DATA_DIR = path.resolve(BASE_DIR, process.env.TEAMCHAT_DATA_DIR || 'data')
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 const HISTORY_FILE = path.join(DATA_DIR, 'messages.json');
 const NOTIFICATION_FILE = path.join(DATA_DIR, 'notifications.json');
+const CONFIG_FILE = path.join(DATA_DIR, 'teamchat.config.json');
 const PUBLIC_BASE_URL = process.env.TEAMCHAT_PUBLIC_BASE_URL || `http://localhost:${PORT}`;
 const AUTH_MODE = String(process.env.TEAMCHAT_AUTH_MODE || 'none').toLowerCase();
 const LOGIN_PASSWORD = process.env.TEAMCHAT_PASSWORD || '';
@@ -26,10 +27,9 @@ const DEMO_MODE = String(process.env.TEAMCHAT_DEMO_MODE || 'true').toLowerCase()
 const VERSION = readVersion();
 const startedAt = Date.now();
 
-const AGENTS = [
+const DEFAULT_AGENTS = [
   { id: 'main', agentId: 'main', name: 'Coordinator', role: 'Team lead', status: 'idle', img: 'agent-main.svg' },
   { id: 'writer', agentId: 'writer', name: 'Writer', role: 'Content and documentation', status: 'idle', img: 'agent-writer.svg' },
-  { id: 'mail', agentId: 'mail', name: 'Mail', role: 'Inbox adapter', status: 'idle', img: 'agent-mail.svg' },
   { id: 'data', agentId: 'data', name: 'Data', role: 'Analytics', status: 'idle', img: 'agent-data.svg' },
   { id: 'qa', agentId: 'qa', name: 'QA', role: 'Quality assurance', status: 'idle', img: 'agent-qa.svg' },
   { id: 'pm', agentId: 'pm', name: 'PM', role: 'Product planning', status: 'idle', img: 'agent-pm.svg' },
@@ -116,6 +116,37 @@ async function route(req, res) {
     return sendJson(res, 200, { ok: true, authenticated: isRequestAuthenticated(req, url), authMode: AUTH_MODE });
   }
 
+  if (pathname === '/api/setup' && method === 'GET') {
+    if (!isRequestAuthenticated(req, url)) {
+      return sendJson(res, 401, { ok: false, error: 'Unauthorized' });
+    }
+    return sendJson(res, 200, buildSetupPayload());
+  }
+
+  if (pathname === '/api/setup' && method === 'POST') {
+    if (!isRequestAuthenticated(req, url)) {
+      return sendJson(res, 401, { ok: false, error: 'Unauthorized' });
+    }
+    const body = await readJsonBody(req);
+    const config = sanitizeSetupConfig(body);
+    writeJsonFile(CONFIG_FILE, config);
+    return sendJson(res, 200, { ok: true, config, generatedEnv: buildEnvSnippet(config) });
+  }
+
+  if (pathname === '/api/agents/discover' && method === 'GET') {
+    if (!isRequestAuthenticated(req, url)) {
+      return sendJson(res, 401, { ok: false, error: 'Unauthorized' });
+    }
+    return sendJson(res, 200, { ok: true, agents: discoverAgents(), source: agentDiscoverySources() });
+  }
+
+  if (pathname === '/api/channels/status' && method === 'GET') {
+    if (!isRequestAuthenticated(req, url)) {
+      return sendJson(res, 401, { ok: false, error: 'Unauthorized' });
+    }
+    return sendJson(res, 200, { ok: true, channels: buildChannelStatus() });
+  }
+
   if (pathname === '/api/login' && method === 'POST') {
     const body = await readJsonBody(req);
     if (AUTH_MODE === 'password' && LOGIN_PASSWORD && body.password !== LOGIN_PASSWORD) {
@@ -141,7 +172,7 @@ async function route(req, res) {
   }
 
   if (pathname === '/api/agents' && method === 'GET') {
-    return sendJson(res, 200, AGENTS);
+    return sendJson(res, 200, getAgents());
   }
 
   if (pathname === '/history') {
@@ -179,22 +210,6 @@ async function route(req, res) {
     });
   }
 
-  if (pathname === '/api/email-sync/status' && method === 'GET') {
-    return sendJson(res, 200, {
-      enabled: adapterEnabled('TEAMCHAT_EMAIL_ENABLED'),
-      status: adapterEnabled('TEAMCHAT_EMAIL_ENABLED') ? 'configured' : 'disabled',
-      pendingSync: 0,
-      pendingIndex: 0,
-      lastCheckTime: Date.now(),
-      lastSyncTime: null,
-      error: null
-    });
-  }
-
-  if (pathname === '/api/email-sync/trigger' && method === 'POST') {
-    return sendJson(res, 200, { ok: true, status: 'disabled', message: 'Email adapter is disabled in the open-source default configuration.' });
-  }
-
   if (pathname === '/api/notifications/history' && method === 'GET') {
     const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit') || 80)));
     return sendJson(res, 200, { ok: true, notifications: loadNotifications().slice(-limit).reverse() });
@@ -204,7 +219,7 @@ async function route(req, res) {
     return sendJson(res, 200, { ok: false, disabled: true, message: 'Local file opening is disabled in the open-source web build.' });
   }
 
-  if (pathname.startsWith('/api/ops/') || pathname.startsWith('/api/admin/') || pathname === '/api/tunnel' || pathname === '/api/mail-tunnel') {
+  if (pathname.startsWith('/api/ops/') || pathname.startsWith('/api/admin/') || pathname === '/api/tunnel') {
     return sendJson(res, 200, { ok: true, status: 'disabled', message: 'Operations adapters are disabled by default.' });
   }
 
@@ -301,7 +316,8 @@ function handleHistory(req, res, url) {
 
 function createAgentExchange(payload = {}) {
   const agentId = normalizeAgentId(payload.agentId || 'main');
-  const agent = AGENTS.find((item) => item.agentId === agentId) || AGENTS[0];
+  const agents = getAgents();
+  const agent = agents.find((item) => item.agentId === agentId) || agents[0] || DEFAULT_AGENTS[0];
   const now = Date.now();
   const sessionId = payload.targetSessionId || `agent:${agentId}:${shortId()}`;
   const userText = String(payload.message || '').trim();
@@ -351,7 +367,7 @@ function createAgentExchange(payload = {}) {
       {
         type: 'tool_use',
         title: 'Mock adapter',
-        content: 'Open-source default mode does not call private OpenClaw, WeCom, Weixin, Feishu, or email services.',
+        content: 'Open-source default mode does not call private OpenClaw, WeCom, Weixin, Feishu, Telegram, or workflow services.',
         status: 'info',
         time: now + 80
       }
@@ -463,6 +479,11 @@ function buildDemoReply(agent, message) {
   return `${text}\n\nThis is the open-source demo adapter. Connect your own OpenClaw, LLM, or workflow backend through the documented adapter environment variables.`;
 }
 
+function getAgents() {
+  const discovered = discoverAgents();
+  return discovered.length ? discovered : DEFAULT_AGENTS;
+}
+
 function buildMetrics() {
   const messages = loadMessages();
   const activeAgents = new Set(messages.filter((message) => !message.isUser && message.agentId).map((message) => message.agentId)).size;
@@ -478,11 +499,13 @@ function buildMetrics() {
 
 function buildSystemMetrics() {
   const mem = process.memoryUsage();
+  const totalMessages = loadMessages().length;
+  const activeAgents = buildMetrics().activeAgents;
   return {
     ok: true,
     status: 'ok',
-    totalMessages: loadMessages().length,
-    activeAgents: buildMetrics().activeAgents,
+    totalMessages,
+    activeAgents,
     onlineUsers: clients.size,
     uptime: Math.floor((Date.now() - startedAt) / 1000),
     memoryUsage: Math.round(mem.rss / 1024 / 1024),
@@ -491,6 +514,15 @@ function buildSystemMetrics() {
       reclaimableBytes: 0,
       fileCount: 0,
       targets: []
+    },
+    teamchat: {
+      totalMessages,
+      users: clients.size,
+      uptime: Math.floor((Date.now() - startedAt) / 1000)
+    },
+    agents: {
+      active: activeAgents,
+      total: getAgents().length
     },
     adapters: buildAdapterStatus()
   };
@@ -502,13 +534,214 @@ function buildAdapterStatus() {
     wecom: adapterEnabled('TEAMCHAT_WECOM_ENABLED') ? 'configured' : 'disabled',
     weixin: adapterEnabled('TEAMCHAT_WEIXIN_ENABLED') ? 'configured' : 'disabled',
     feishu: adapterEnabled('TEAMCHAT_FEISHU_ENABLED') ? 'configured' : 'disabled',
-    email: adapterEnabled('TEAMCHAT_EMAIL_ENABLED') ? 'configured' : 'disabled',
+    telegram: adapterEnabled('TEAMCHAT_TELEGRAM_ENABLED') ? 'configured' : 'disabled',
     tunnel: adapterEnabled('TEAMCHAT_TUNNEL_ENABLED') ? 'configured' : 'disabled'
   };
 }
 
 function adapterEnabled(name) {
   return String(process.env[name] || '').toLowerCase() === 'true';
+}
+
+function buildSetupPayload() {
+  const config = readJsonFile(CONFIG_FILE, {});
+  const merged = sanitizeSetupConfig(config);
+  const agents = getAgents();
+  const channels = buildChannelStatus();
+  return {
+    ok: true,
+    configured: fs.existsSync(CONFIG_FILE),
+    config: merged,
+    generatedEnv: buildEnvSnippet(merged),
+    agents,
+    channels,
+    guides: {
+      tunnel: {
+        env: ['TEAMCHAT_TUNNEL_ENABLED=true', 'TEAMCHAT_PUBLIC_BASE_URL=https://your-domain.example'],
+        notes: [
+          'Use any tunnel provider that can forward the TeamChat HTTP port.',
+          'Set TEAMCHAT_PUBLIC_BASE_URL to the externally reachable URL.'
+        ]
+      },
+      avatars: {
+        env: ['TEAMCHAT_AVATAR_DIR=./public/assets/avatars'],
+        notes: [
+          'Use an agent img field such as agent-main.svg or an HTTPS image URL.',
+          'Local avatar files should live under public/assets/avatars or another static path you serve.'
+        ]
+      },
+      auth: {
+        env: ['TEAMCHAT_AUTH_MODE=password', 'TEAMCHAT_PASSWORD=change-me'],
+        notes: [
+          'Use password mode for remote access.',
+          'For production, put secrets in your process manager or hosting secret store instead of committing .env.'
+        ]
+      },
+      agents: {
+        env: ['TEAMCHAT_AGENTS_JSON=./config/agents.json', 'TEAMCHAT_AGENT_DISCOVERY_PATHS=./agents,./config/agents.json'],
+        notes: [
+          'TeamChat can load agents from a JSON file or scan local agent folders.',
+          'If discovery finds nothing, the built-in demo roster is used.'
+        ]
+      },
+      channels: {
+        env: ['TEAMCHAT_CHANNELS=teamchat,tui,telegram,wecom,weixin,feishu,qqbot'],
+        notes: [
+          'Channel monitoring reports local configuration status without exposing tokens.',
+          'Each channel can be enabled with TEAMCHAT_<CHANNEL>_ENABLED=true.'
+        ]
+      }
+    }
+  };
+}
+
+function sanitizeSetupConfig(raw = {}) {
+  const language = ['zh-CN', 'en-US'].includes(raw.language) ? raw.language : 'zh-CN';
+  const authMode = ['none', 'password'].includes(raw.authMode) ? raw.authMode : AUTH_MODE;
+  const channels = Array.isArray(raw.channels)
+    ? raw.channels.map(String).filter(Boolean).slice(0, 20)
+    : [];
+  return {
+    language,
+    authMode,
+    publicBaseUrl: String(raw.publicBaseUrl || PUBLIC_BASE_URL),
+    tunnelEnabled: Boolean(raw.tunnelEnabled),
+    tunnelProvider: String(raw.tunnelProvider || ''),
+    avatarDir: String(raw.avatarDir || process.env.TEAMCHAT_AVATAR_DIR || './public/assets/avatars'),
+    agentsJson: String(raw.agentsJson || process.env.TEAMCHAT_AGENTS_JSON || ''),
+    agentDiscoveryPaths: String(raw.agentDiscoveryPaths || process.env.TEAMCHAT_AGENT_DISCOVERY_PATHS || './agents,./config/agents.json'),
+    channels: channels.length ? channels : configuredChannelNames()
+  };
+}
+
+function buildEnvSnippet(config = {}) {
+  const channels = Array.isArray(config.channels) && config.channels.length ? config.channels.join(',') : 'teamchat,tui,telegram';
+  return [
+    `TEAMCHAT_PUBLIC_BASE_URL=${config.publicBaseUrl || PUBLIC_BASE_URL}`,
+    `TEAMCHAT_AUTH_MODE=${config.authMode || AUTH_MODE}`,
+    'TEAMCHAT_PASSWORD=change-me',
+    `TEAMCHAT_TUNNEL_ENABLED=${config.tunnelEnabled ? 'true' : 'false'}`,
+    `TEAMCHAT_AVATAR_DIR=${config.avatarDir || './public/assets/avatars'}`,
+    `TEAMCHAT_AGENTS_JSON=${config.agentsJson || './config/agents.json'}`,
+    `TEAMCHAT_AGENT_DISCOVERY_PATHS=${config.agentDiscoveryPaths || './agents,./config/agents.json'}`,
+    `TEAMCHAT_CHANNELS=${channels}`,
+    'TEAMCHAT_TELEGRAM_ENABLED=false'
+  ].join('\n');
+}
+
+function agentDiscoverySources(config = readJsonFile(CONFIG_FILE, {})) {
+  const fromEnv = String(process.env.TEAMCHAT_AGENT_DISCOVERY_PATHS || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const fromConfig = String(config.agentDiscoveryPaths || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return [
+    config.agentsJson,
+    process.env.TEAMCHAT_AGENTS_JSON,
+    path.join(BASE_DIR, 'config', 'agents.json'),
+    path.join(DATA_DIR, 'agents.json'),
+    ...fromConfig,
+    ...fromEnv
+  ].filter(Boolean);
+}
+
+function discoverAgents() {
+  const config = readJsonFile(CONFIG_FILE, {});
+  const discovered = [];
+  for (const source of agentDiscoverySources(config)) {
+    const resolved = path.resolve(BASE_DIR, source);
+    if (!fs.existsSync(resolved)) continue;
+    const stat = fs.statSync(resolved);
+    if (stat.isFile() && resolved.endsWith('.json')) {
+      discovered.push(...readAgentsJson(resolved));
+    } else if (stat.isDirectory()) {
+      discovered.push(...readAgentsDirectory(resolved));
+    }
+  }
+  return dedupeAgents(discovered).slice(0, 64);
+}
+
+function readAgentsJson(filePath) {
+  const raw = readJsonFile(filePath, null);
+  const list = Array.isArray(raw) ? raw : (Array.isArray(raw?.agents) ? raw.agents : []);
+  return list.map(normalizeAgentRecord).filter(Boolean);
+}
+
+function readAgentsDirectory(dirPath) {
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isDirectory() || entry.name.endsWith('.json'))
+    .map((entry) => {
+      const agentId = path.basename(entry.name, '.json');
+      const configPath = entry.isDirectory()
+        ? path.join(dirPath, entry.name, 'agent.json')
+        : path.join(dirPath, entry.name);
+      const config = fs.existsSync(configPath) ? readJsonFile(configPath, {}) : {};
+      return normalizeAgentRecord({ id: agentId, agentId, ...config });
+    })
+    .filter(Boolean);
+}
+
+function normalizeAgentRecord(agent = {}) {
+  const agentId = normalizeAgentId(agent.agentId || agent.id || agent.name);
+  if (!agentId) return null;
+  return {
+    id: agentId,
+    agentId,
+    name: String(agent.name || agentId),
+    role: String(agent.role || agent.description || 'Agent'),
+    status: String(agent.status || 'idle'),
+    img: String(agent.img || agent.avatar || `agent-${agentId}.svg`)
+  };
+}
+
+function dedupeAgents(agents) {
+  const seen = new Set();
+  const result = [];
+  for (const agent of agents) {
+    const key = agent.agentId || agent.id;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(agent);
+  }
+  return result;
+}
+
+function configuredChannelNames() {
+  const config = readJsonFile(CONFIG_FILE, {});
+  const fromConfig = Array.isArray(config.channels) && config.channels.length
+    ? config.channels.join(',')
+    : '';
+  const configured = String(fromConfig || process.env.TEAMCHAT_CHANNELS || 'teamchat,tui,telegram,wecom,weixin,feishu,qqbot')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+  return Array.from(new Set(configured));
+}
+
+function buildChannelStatus() {
+  return configuredChannelNames().map((name) => {
+    const envName = name.replace(/[^a-z0-9]/g, '_').toUpperCase();
+    const enabled = adapterEnabled(`TEAMCHAT_${envName}_ENABLED`) || name === 'teamchat';
+    const hasToken = Boolean(
+      process.env[`TEAMCHAT_${envName}_TOKEN`]
+      || process.env[`TEAMCHAT_${envName}_WEBHOOK`]
+      || process.env[`TEAMCHAT_${envName}_URL`]
+    );
+    return {
+      name,
+      enabled,
+      configured: enabled && (name === 'teamchat' || hasToken),
+      status: enabled ? (name === 'teamchat' || hasToken ? 'ready' : 'needs_config') : 'disabled',
+      lastCheckedAt: Date.now(),
+      note: name === 'teamchat'
+        ? 'Built-in TeamChat channel'
+        : `Set TEAMCHAT_${envName}_ENABLED=true and provide token/webhook/url env vars to connect this channel.`
+    };
+  });
 }
 
 function isRequestAuthenticated(req, url) {
@@ -714,7 +947,6 @@ function normalizeAgentId(value) {
     lobster: 'main',
     coordinator: 'main',
     writer: 'writer',
-    mail: 'mail',
     data: 'data',
     qa: 'qa',
     pm: 'pm',

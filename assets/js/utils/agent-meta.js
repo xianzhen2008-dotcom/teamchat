@@ -9,11 +9,6 @@ const AGENT_CATALOG = {
         role: 'Content and documentation',
         aliases: ['writer', 'agent-writer', 'agent_writer']
     },
-    mail: {
-        name: 'Mail',
-        role: 'Inbox adapter',
-        aliases: ['mail', 'agent-mail', 'agent_mail']
-    },
     data: {
         name: 'Data',
         role: 'Analytics',
@@ -64,7 +59,6 @@ const AGENT_CATALOG = {
 export const AGENT_ORDER = [
     'main',
     'writer',
-    'mail',
     'data',
     'qa',
     'pm',

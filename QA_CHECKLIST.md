@@ -34,7 +34,7 @@ npm run smoke
 - Agent logs stream endpoint is reachable in browser
 - Dashboard and sidebar load correctly
 - WebSocket upgrade path works in deployment env (behind proxy)
-- Optional integrations (mail sync, tunnel, webhook) behave as expected when configured
+- Optional integrations (tunnel, webhook, and chat-channel adapters) behave as expected when configured
 
 ## 5) Known clean-environment warnings (non-fatal)
 

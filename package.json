@@ -1,6 +1,6 @@
 {
   "name": "@openclaw/teamchat",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Open-source multi-agent team chat workspace with realtime messaging, action logs, PWA, and Android packaging.",
   "type": "module",
   "main": "team_chat_server.cjs",
@@ -37,6 +37,17 @@
   },
   "bugs": {
     "url": "https://github.com/xianzhen2008-dotcom/teamchat/issues"
+  },
+  "openclaw": {
+    "compat": {
+      "pluginApi": ">=2026.3.22"
+    },
+    "build": {
+      "openclawVersion": "2026.4.23"
+    },
+    "install": {
+      "minHostVersion": ">=2026.3.22"
+    }
   },
   "dependencies": {
     "@capacitor/core": "^7.4.3",

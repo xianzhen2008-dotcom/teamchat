@@ -967,7 +967,16 @@ class App {
         const sender = this._resolveAgentName(sessionKey);
         const senderAgentId = this._resolveAgentId(sessionKey);
         const content = payload?.message?.content;
-        const text = Array.isArray(content) ? content.find(c => c?.type === 'text')?.text : (typeof content === 'string' ? content : null);
+        const textBlocks = Array.isArray(content)
+            ? content
+                .filter(block => block?.type === 'text' && typeof block.text === 'string')
+                .map(block => block.text)
+                .filter(Boolean)
+            : [];
+        // Realtime payloads may prepend action-log text blocks before the final assistant reply.
+        const text = Array.isArray(content)
+            ? (textBlocks[textBlocks.length - 1] || textBlocks[0] || null)
+            : (typeof content === 'string' ? content : null);
 
         const realtimeModel = this._resolveRealtimeModel(payload);
         const model = realtimeModel.modelId;
@@ -1436,7 +1445,7 @@ class App {
 📋 TeamChat 使用指南：
 1️⃣ 发文件：先 share-file 获取链接，再 send 发送（格式：[显示名](URL)）
 2️⃣ @协作：回复中 @dev/@qa 等可触发其他 Agent（限3层递归）
-3️⃣ 可用 Agent：main dev qa mail data writer pm finance devops mobile frontend backend
+3️⃣ 可用 Agent：main dev qa data writer pm finance devops mobile frontend backend
 4️⃣ 支持 Markdown、文件路径自动识别
 [/SYSTEM]`;
         const messageWithHint = contextMessage + '\n\n' + capabilitiesHint;

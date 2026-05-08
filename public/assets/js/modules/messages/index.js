@@ -717,7 +717,6 @@ class MessagesModule {
             feishu: 'Feishu',
             telegram: 'Telegram',
             whatsapp: 'WhatsApp',
-            email: 'Mail',
             system: 'System'
         };
         return labels[normalized] || '';

@@ -188,15 +188,6 @@ export class MetricsDashboard {
                                 <button class="open-btn" id="open-teamchat-btn" title="打开登录页">↗️</button>
                             </div>
                         </div>
-                        <div class="tunnel-link-item">
-                            <span class="tunnel-link-label">邮件系统</span>
-                            <div class="tunnel-link-actions">
-                                <input type="text" id="mail-tunnel-url" readonly placeholder="点击按钮获取最新链接">
-                                <button class="copy-btn" id="copy-mail-btn" title="复制链接">📋</button>
-                                <button class="refresh-btn" id="refresh-mail-btn" title="刷新链接">🔄</button>
-                                <button class="open-btn" id="open-mail-btn" title="打开登录页">↗️</button>
-                            </div>
-                        </div>
                     </div>
                 </div>
                 <div class="admin-controls-section">
@@ -248,22 +239,13 @@ export class MetricsDashboard {
         const copyTeamChatBtn = this.container.querySelector('#copy-teamchat-btn');
         copyTeamChatBtn.addEventListener('click', () => this.copyToClipboard('teamchat-tunnel-url', copyTeamChatBtn));
         
-        const copyMailBtn = this.container.querySelector('#copy-mail-btn');
-        copyMailBtn.addEventListener('click', () => this.copyToClipboard('mail-tunnel-url', copyMailBtn));
-        
         // 刷新按钮事件
         const refreshTeamChatBtn = this.container.querySelector('#refresh-teamchat-btn');
         refreshTeamChatBtn.addEventListener('click', () => this.refreshTunnelUrl('teamchat'));
         
-        const refreshMailBtn = this.container.querySelector('#refresh-mail-btn');
-        refreshMailBtn.addEventListener('click', () => this.refreshTunnelUrl('mail'));
-        
         // 打开按钮事件
         const openTeamChatBtn = this.container.querySelector('#open-teamchat-btn');
         openTeamChatBtn.addEventListener('click', () => this.openTunnelUrl('teamchat'));
-        
-        const openMailBtn = this.container.querySelector('#open-mail-btn');
-        openMailBtn.addEventListener('click', () => this.openTunnelUrl('mail'));
         
         // 管理按钮事件
         const restartGatewayBtn = this.container.querySelector('#restart-gateway-btn');
@@ -384,15 +366,12 @@ export class MetricsDashboard {
     }
     
     async fetchTunnelUrls() {
-        await Promise.allSettled([
-            this.refreshTunnelUrl('teamchat'),
-            this.refreshTunnelUrl('mail')
-        ]);
+        await this.refreshTunnelUrl('teamchat');
     }
     
     async refreshTunnelUrl(type) {
-        const url = type === 'teamchat' ? '/api/tunnel' : '/api/mail-tunnel';
-        const inputId = type === 'teamchat' ? 'teamchat-tunnel-url' : 'mail-tunnel-url';
+        const url = '/api/tunnel';
+        const inputId = 'teamchat-tunnel-url';
         const refreshBtn = this.container.querySelector(`#refresh-${type}-btn`);
         
         try {
@@ -434,7 +413,7 @@ export class MetricsDashboard {
     }
     
     openTunnelUrl(type) {
-        const inputId = type === 'teamchat' ? 'teamchat-tunnel-url' : 'mail-tunnel-url';
+        const inputId = 'teamchat-tunnel-url';
         const input = this.container.querySelector(`#${inputId}`);
         const rawValue = this[`${type}TunnelUrl`] || input?.value || '';
         const tunnelUrl = rawValue.replace(/\s+\(本地\)\s*$/, '').trim();
@@ -444,7 +423,7 @@ export class MetricsDashboard {
         }
         
         // 自动跳转到登录页
-        const loginUrl = type === 'teamchat' ? `${tunnelUrl}/team_chat_login.html` : tunnelUrl;
+        const loginUrl = `${tunnelUrl}/team_chat_login.html`;
         window.open(loginUrl, '_blank');
     }
 

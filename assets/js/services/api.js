@@ -150,10 +150,6 @@ class ApiService {
         return this.request('/api/agent-threads/summary');
     }
 
-    async getAgentMailbox(agentId) {
-        return this.request(`/api/agent-threads/mailbox/${encodeURIComponent(agentId)}`);
-    }
-
     async listAgentThreads(agentId = 'main', options = {}) {
         const params = new URLSearchParams();
         params.set('agentId', agentId);
