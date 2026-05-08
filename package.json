@@ -39,6 +39,9 @@
     "url": "https://github.com/xianzhen2008-dotcom/teamchat/issues"
   },
   "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ],
     "compat": {
       "pluginApi": ">=2026.3.22"
     },
